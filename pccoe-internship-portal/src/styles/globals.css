@@ -1,0 +1,88 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Sora:wght@100..800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-primary: #080C18;
+    --bg-secondary: #0E1425;
+    --bg-tertiary: #141929;
+    
+    --accent-blue: #3B82F6;
+    --accent-gold: #F59E0B;
+    --accent-teal: #14B8A6;
+    
+    --text-primary: #F1F5F9;
+    --text-secondary: #94A3B8;
+    
+    --border: rgba(255, 255, 255, 0.07);
+    --glow: 0 0 40px rgba(59, 130, 246, 0.15);
+
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.1) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(20, 184, 166, 0.05) 0px, transparent 50%);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading tracking-tight;
+  }
+
+  code, pre {
+    @apply font-mono;
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply backdrop-blur-xl bg-white/5 border border-white/10;
+  }
+  
+  .glass-card {
+    @apply glass rounded-xl shadow-lg transition-all duration-300;
+  }
+  
+  .glass-card:hover {
+    @apply scale-[1.01] border-white/20 shadow-[var(--glow)];
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-accent-blue to-accent-teal;
+  }
+}
+
+/* Custom Thin Blue Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary); 
+}
+ 
+::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.3); 
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.5); 
+}
+
+/* Radix primitives specific resets if needed */
+.radix-state-active {
+  /* Common active state styles for radix tabs etc */
+}
