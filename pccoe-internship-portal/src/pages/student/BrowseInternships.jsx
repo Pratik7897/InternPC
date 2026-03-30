@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, MapPin, Calendar, DollarSign, Briefcase, X, ChevronRight } from 'lucide-react'
+import { Search, MapPin, DollarSign, Briefcase, X, ChevronRight, RefreshCw } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
 import { Input } from '../../components/ui/Input'
@@ -25,7 +25,7 @@ export default function BrowseInternships() {
   const fetchInternships = async () => {
     setIsLoading(true)
     try {
-      // 1. Fetch active internships from Supabase
+      // 1. Always fetch fresh active internships from Supabase (no cache)
       const { data: jobsData, error: jobsError } = await supabase
         .from('internships')
         .select('*')
@@ -34,25 +34,24 @@ export default function BrowseInternships() {
       
       if (jobsError) throw jobsError
 
-      // 2. Fetch student's applications to see which are "Applied"
-      const { data: appliedData, error: appliedError } = await supabase
+      // 2. Fetch student's existing applications to mark which ones they applied to
+      const { data: appliedData } = await supabase
         .from('applications')
         .select('internship_id')
         .eq('student_id', user.id)
-      
-      if (appliedError) throw appliedError
 
-      // 3. IF they have a providerToken from Google, fetch their Gmail opportunities!
+      // 3. If they logged in with Google and have a provider token, fetch Gmail
       let gmailJobs = []
       if (providerToken) {
         gmailJobs = await fetchGmailInternships(providerToken)
       }
 
-      // Combine both lists
+      // Supabase jobs first, Gmail after
       setInternships([...(jobsData || []), ...gmailJobs])
-      setAppliedJobs(new Set(appliedData.map(app => app.internship_id)))
+      setAppliedJobs(new Set((appliedData || []).map(app => app.internship_id)))
     } catch (error) {
       toast.error("Failed to load internships.")
+      console.error(error)
     } finally {
       setIsLoading(false)
     }
@@ -83,59 +82,78 @@ export default function BrowseInternships() {
           <h1 className="text-3xl font-heading font-bold text-text-primary">Internships</h1>
           <p className="text-text-secondary mt-1">Discover and apply to top opportunities.</p>
         </div>
-        <div className="relative w-full md:w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
-          <Input 
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search roles..." 
-            className="pl-9"
-          />
+        <div className="flex gap-3">
+          <div className="relative w-full md:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
+            <Input 
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search roles..." 
+              className="pl-9"
+            />
+          </div>
+          <Button variant="outline" onClick={fetchInternships} disabled={isLoading} className="gap-2 shrink-0">
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {isLoading ? (
-          <p className="text-text-secondary">Loading opportunities...</p>
+          <div className="col-span-2 flex items-center justify-center p-20">
+            <div className="w-10 h-10 border-4 border-white/10 border-t-accent-blue rounded-full animate-spin"></div>
+          </div>
         ) : internships.length === 0 ? (
-          <p className="text-text-secondary">No active internships found.</p>
-        ) : internships.filter(job => job.title.toLowerCase().includes(search.toLowerCase()) || job.company_name.toLowerCase().includes(search.toLowerCase())).map((job) => (
-          <motion.div
-            key={job.id}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="glass-card p-6 flex flex-col cursor-pointer border hover:border-accent-blue/50 transition-colors"
-            onClick={() => setSelectedJob(job)}
-          >
-            <div className="flex justify-between items-start mb-4">
-              <div className="w-12 h-12 bg-white rounded-lg p-1.5 shrink-0">
-                <img src={job.company_logo_url || 'https://via.placeholder.com/150'} alt={job.company_name} className="w-full h-full object-contain" />
-              </div>
-              {appliedJobs.has(job.id) ? (
-                <Badge className="bg-emerald-500/20 text-emerald-400">Applied ✓</Badge>
-              ) : job.is_featured && (
-                <Badge className="bg-accent-gold/20 text-accent-gold">Featured</Badge>
-              )}
-            </div>
-            
-            <h3 className="text-xl font-heading font-bold mb-1">{job.title}</h3>
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-accent-blue font-medium">{job.company_name}</span>
-              {job.is_gmail && <Badge className="bg-orange-500/10 text-orange-400 border border-orange-500/20 text-[10px] py-0">From Gmail</Badge>}
-            </div>
-            
-            <div className="flex flex-wrap gap-4 text-sm text-text-secondary mb-6 flex-1">
-              <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /> {job.location} ({job.work_mode})</span>
-              <span className="flex items-center gap-1.5"><DollarSign className="w-4 h-4" /> {job.stipend}</span>
-              <span className="flex items-center gap-1.5"><Briefcase className="w-4 h-4" /> {job.duration}</span>
-            </div>
-            
-            <div className="mt-auto border-t border-white/10 pt-4 flex items-center justify-between">
-              <p className="text-xs text-text-secondary">Deadline: {job.deadline}</p>
-              <span className="text-sm font-medium text-accent-blue flex items-center gap-1">View Details <ChevronRight className="w-4 h-4" /></span>
-            </div>
-          </motion.div>
-        ))}
+          <div className="col-span-2 text-center py-20">
+            <Briefcase className="w-16 h-16 text-text-secondary mx-auto mb-4 opacity-30" />
+            <p className="text-text-secondary text-lg">No active internships found.</p>
+            <p className="text-text-secondary text-sm mt-1">Check back later or log in with Google to see Gmail-sourced opportunities.</p>
+          </div>
+        ) : (
+          internships
+            .filter(job => 
+              job.title?.toLowerCase().includes(search.toLowerCase()) || 
+              job.company_name?.toLowerCase().includes(search.toLowerCase())
+            )
+            .map((job) => (
+              <motion.div
+                key={job.id}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="glass-card p-6 flex flex-col cursor-pointer border hover:border-accent-blue/50 transition-colors"
+                onClick={() => setSelectedJob(job)}
+              >
+                <div className="flex justify-between items-start mb-4">
+                  <div className="w-12 h-12 bg-white rounded-lg p-1.5 shrink-0">
+                    <img src={job.company_logo_url || 'https://ui-avatars.com/api/?name=Company&background=random'} alt={job.company_name} className="w-full h-full object-contain" />
+                  </div>
+                  {appliedJobs.has(job.id) ? (
+                    <Badge className="bg-emerald-500/20 text-emerald-400">Applied ✓</Badge>
+                  ) : job.is_featured && (
+                    <Badge className="bg-accent-gold/20 text-accent-gold">Featured</Badge>
+                  )}
+                </div>
+                
+                <h3 className="text-xl font-heading font-bold mb-1">{job.title}</h3>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-accent-blue font-medium">{job.company_name}</span>
+                  {job.is_gmail && <Badge className="bg-orange-500/10 text-orange-400 border border-orange-500/20 text-[10px] py-0">From Gmail</Badge>}
+                </div>
+                
+                <div className="flex flex-wrap gap-4 text-sm text-text-secondary mb-6 flex-1">
+                  <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /> {job.location} ({job.work_mode})</span>
+                  <span className="flex items-center gap-1.5"><DollarSign className="w-4 h-4" /> {job.stipend}</span>
+                  <span className="flex items-center gap-1.5"><Briefcase className="w-4 h-4" /> {job.duration}</span>
+                </div>
+                
+                <div className="mt-auto border-t border-white/10 pt-4 flex items-center justify-between">
+                  <p className="text-xs text-text-secondary">Deadline: {job.deadline}</p>
+                  <span className="text-sm font-medium text-accent-blue flex items-center gap-1">View Details <ChevronRight className="w-4 h-4" /></span>
+                </div>
+              </motion.div>
+            ))
+        )}
       </div>
 
       {/* Detail Modal Overlay */}
@@ -164,7 +182,7 @@ export default function BrowseInternships() {
               <div className="p-6 md:p-8 space-y-6">
                 <div className="flex items-start gap-5">
                   <div className="w-16 h-16 bg-white rounded-xl p-2 shrink-0 border border-white/10">
-                    <img src={selectedJob.company_logo_url || 'https://via.placeholder.com/150'} alt={selectedJob.company_name} className="w-full h-full object-contain" />
+                    <img src={selectedJob.company_logo_url || 'https://ui-avatars.com/api/?name=Company'} alt={selectedJob.company_name} className="w-full h-full object-contain" />
                   </div>
                   <div>
                     <h2 className="text-2xl font-bold font-heading">{selectedJob.title}</h2>
@@ -216,7 +234,7 @@ export default function BrowseInternships() {
                     {selectedJob.is_gmail ? (
                        <>
                          <h3 className="text-lg font-bold mb-3">Apply via Gmail</h3>
-                         <p className="text-sm text-text-secondary mb-4">This internship was sourced from your personal Gmail inbox. To apply or respond, you need to continue the thread in your email client.</p>
+                         <p className="text-sm text-text-secondary mb-4">This internship was sourced from your personal Gmail inbox. Reply directly in your email to apply.</p>
                          <div className="flex gap-4">
                            <Button onClick={() => window.open(selectedJob.apply_link, '_blank')} className="flex-1 shadow-[var(--glow)]">Open in Gmail</Button>
                            <Button variant="outline" onClick={() => setSelectedJob(null)} className="flex-1">Close</Button>
@@ -254,4 +272,3 @@ export default function BrowseInternships() {
     </div>
   )
 }
-// Note: Need ChevronRight from lucide-react

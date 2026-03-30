@@ -66,61 +66,50 @@ export default function ProfileForm() {
   const handlePrev = () => setCurrentStep(s => Math.max(s - 1, 1))
 
   const handleComplete = async () => {
-    console.log("👉 Button Clicked!");
-    alert("Button Clicked! Starting Save Process...");
-    setIsSaving(true);
-    
+    if (!user) return toast.error("Not logged in.")
+    setIsSaving(true)
     try {
-      console.log("Preparing Data...");
-      if (!user) {
-        alert("ERROR: User is null");
-        return;
-      }
+      // Calculate a real profile completion percentage
+      const fields = [
+        formData.fullName, formData.phone, formData.dob, formData.gender,
+        formData.prn, formData.branch, formData.year, formData.cgpa,
+        formData.techSkills
+      ]
+      const filled = fields.filter(f => f && f.toString().trim() !== '').length
+      const completion = Math.round((filled / fields.length) * 100)
 
       const updateData = {
         id: user.id,
-        full_name: formData.fullName || 'Student',
-        branch: formData.branch || '',
-        cgpa: formData.cgpa ? parseFloat(formData.cgpa) : 0,
-        profile_completion: 100, // Force completion for now to bypass logic
+        full_name: formData.fullName || null,
+        phone: formData.phone || null,
+        date_of_birth: formData.dob || null,
+        gender: formData.gender || null,
+        linkedin_url: formData.linkedin || null,
+        github_url: formData.github || null,
+        prn_number: formData.prn || null,
+        branch: formData.branch || null,
+        current_year: formData.year || null,
+        cgpa: formData.cgpa ? parseFloat(formData.cgpa) : null,
+        active_backlogs: formData.backlogs ? parseInt(formData.backlogs) : 0,
+        technical_skills: formData.techSkills
+          ? formData.techSkills.split(',').map(s => s.trim()).filter(Boolean)
+          : [],
+        soft_skills: formData.softSkills
+          ? formData.softSkills.split(',').map(s => s.trim()).filter(Boolean)
+          : [],
+        profile_completion: completion,
         updated_at: new Date().toISOString()
-      };
-
-      console.log("Data ready, sending to Supabase:", updateData);
-      
-      const { data: sessionData } = await supabase.auth.getSession()
-      const token = sessionData?.session?.access_token
-      
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/profiles`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${token}`,
-          'Prefer': 'return=representation, resolution=merge-duplicates'
-        },
-        body: JSON.stringify(updateData)
-      });
-      
-      const responseData = await response.json().catch(() => null);
-
-      console.log("Fetch response:", response.status, responseData);
-
-      if (!response.ok) {
-         console.error("Supabase API Error:", responseData);
-         alert("DATABASE REJECTED SAVE: " + (responseData?.message || JSON.stringify(responseData)));
-         setIsSaving(false);
-         return;
       }
-      
-      alert("SUCCESS! Profile saved in Supabase!");
-      setIsSaving(false);
-      toast.success('Successfully Saved!');
-      
+
+      const { error } = await supabase.from('profiles').upsert(updateData)
+      if (error) throw error
+
+      toast.success('Profile saved successfully! (' + completion + '% complete)')
     } catch (err) {
-       console.error("Crash:", err);
-       alert("CRASH: " + String(err));
-       setIsSaving(false);
+      console.error('Profile save error:', err)
+      toast.error('Failed to save profile: ' + err.message)
+    } finally {
+      setIsSaving(false)
     }
   }
 
