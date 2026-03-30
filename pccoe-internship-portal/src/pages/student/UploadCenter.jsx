@@ -50,7 +50,7 @@ export default function UploadCenter() {
     setIsUploadingResume(true)
     try {
       const url = await uploadFile(file, `${user.id}/resume.pdf`)
-      await supabase.from('profiles').upsert({ id: user.id, resume_url: url })
+      await supabase.from('profiles').update({ resume_url: url }).eq('id', user.id)
       setProfile(prev => ({ ...prev, resume_url: url }))
       toast.success('Resume uploaded successfully!')
     } catch (err) {
@@ -71,7 +71,7 @@ export default function UploadCenter() {
     try {
       const ext = file.name.split('.').pop()
       const url = await uploadFile(file, `${user.id}/intro_video.${ext}`)
-      await supabase.from('profiles').upsert({ id: user.id, intro_video_url: url })
+      await supabase.from('profiles').update({ intro_video_url: url }).eq('id', user.id)
       setProfile(prev => ({ ...prev, intro_video_url: url }))
       toast.success('Video uploaded successfully!')
     } catch (err) {
@@ -111,7 +111,7 @@ export default function UploadCenter() {
       }
       const updatedCerts = [...existingCerts, newCert]
 
-      await supabase.from('profiles').upsert({ id: user.id, certificates: updatedCerts })
+      await supabase.from('profiles').update({ certificates: updatedCerts }).eq('id', user.id)
       setProfile(prev => ({ ...prev, certificates: updatedCerts }))
 
       setCertName('')
@@ -130,7 +130,7 @@ export default function UploadCenter() {
 
   const handleDeleteCert = async (index) => {
     const updatedCerts = (profile?.certificates || []).filter((_, i) => i !== index)
-    await supabase.from('profiles').upsert({ id: user.id, certificates: updatedCerts })
+    await supabase.from('profiles').update({ certificates: updatedCerts }).eq('id', user.id)
     setProfile(prev => ({ ...prev, certificates: updatedCerts }))
     toast.success('Certificate removed')
   }

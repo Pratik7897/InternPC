@@ -36,13 +36,47 @@ export default function ProfileForm() {
     softSkills: '',
   })
 
-  // Fetch initial profile data
+  const CACHE_KEY = user ? `profile_form_${user.id}` : null
+
+  // Populate form from localStorage cache instantly, then refresh from DB
   useEffect(() => {
+    if (!user) return
+
+    // Step 1: Load from localStorage immediately for instant display
+    const cached = localStorage.getItem(CACHE_KEY)
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached)
+        setFormData(prev => ({ ...prev, ...parsed }))
+      } catch {}
+    }
+
+    // Step 2: Fetch fresh data from Supabase in the background
     const fetchProfile = async () => {
-      if (!user) return
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
-      if (data) {
-        setFormData({
+      try {
+        const { data: sessionData } = await supabase.auth.getSession()
+        const token = sessionData?.session?.access_token
+        if (!token) return
+
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+        const res = await fetch(
+          `${supabaseUrl}/rest/v1/profiles?id=eq.${user.id}&select=*&limit=1`,
+          {
+            headers: {
+              'apikey': supabaseKey,
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/json'
+            }
+          }
+        )
+        if (!res.ok) return
+        const rows = await res.json()
+        const data = rows?.[0]
+        if (!data) return
+
+        const loaded = {
           fullName: data.full_name || '',
           phone: data.phone || '',
           dob: data.date_of_birth || '',
@@ -56,7 +90,12 @@ export default function ProfileForm() {
           backlogs: data.active_backlogs ? data.active_backlogs.toString() : '0',
           techSkills: data.technical_skills ? data.technical_skills.join(', ') : '',
           softSkills: data.soft_skills ? data.soft_skills.join(', ') : '',
-        })
+        }
+        setFormData(loaded)
+        // Update localStorage cache with fresh DB data
+        localStorage.setItem(CACHE_KEY, JSON.stringify(loaded))
+      } catch (err) {
+        console.error('fetchProfile error:', err)
       }
     }
     fetchProfile()
@@ -69,7 +108,6 @@ export default function ProfileForm() {
     if (!user) return toast.error("Not logged in.")
     setIsSaving(true)
     try {
-      // Calculate a real profile completion percentage
       const fields = [
         formData.fullName, formData.phone, formData.dob, formData.gender,
         formData.prn, formData.branch, formData.year, formData.cgpa,
@@ -78,15 +116,13 @@ export default function ProfileForm() {
       const filled = fields.filter(f => f && f.toString().trim() !== '').length
       const completion = Math.round((filled / fields.length) * 100)
 
-      const updateData = {
-        id: user.id,
+      const payload = {
         full_name: formData.fullName || null,
         phone: formData.phone || null,
         date_of_birth: formData.dob || null,
         gender: formData.gender || null,
         linkedin_url: formData.linkedin || null,
         github_url: formData.github || null,
-        prn_number: formData.prn || null,
         branch: formData.branch || null,
         current_year: formData.year || null,
         cgpa: formData.cgpa ? parseFloat(formData.cgpa) : null,
@@ -101,13 +137,51 @@ export default function ProfileForm() {
         updated_at: new Date().toISOString()
       }
 
-      const { error } = await supabase.from('profiles').upsert(updateData)
-      if (error) throw error
+      console.log('Saving profile for user:', user.id)
+      console.log('Payload:', payload)
 
-      toast.success('Profile saved successfully! (' + completion + '% complete)')
+      // Get current session token for direct REST call (most reliable approach)
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData?.session?.access_token
+      
+      if (!token) {
+        throw new Error('No auth token — please log out and log back in.')
+      }
+
+      console.log('Token obtained, calling Supabase REST...')
+
+      // Use direct fetch to Supabase REST API — more reliable than the JS client for updates
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+      const response = await fetch(
+        `${supabaseUrl}/rest/v1/profiles?id=eq.${user.id}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${token}`,
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify(payload)
+        }
+      )
+
+      if (!response.ok) {
+        const errBody = await response.text()
+        throw new Error(`Server error ${response.status}: ${errBody}`)
+      }
+
+      // Cache to localStorage so refresh shows data instantly without waiting for DB
+      if (CACHE_KEY) {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(formData))
+      }
+
+      toast.success(`Profile saved! (${completion}% complete)`)
     } catch (err) {
       console.error('Profile save error:', err)
-      toast.error('Failed to save profile: ' + err.message)
+      toast.error('Failed to save: ' + (err.message || 'Unknown error'))
     } finally {
       setIsSaving(false)
     }
