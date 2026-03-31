@@ -1,15 +1,32 @@
 import { create } from 'zustand'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 
+// localStorage key for persisting the Gmail provider token across page refreshes
+const PROVIDER_TOKEN_KEY = 'gmail_provider_token'
+
 // Track if we've already registered the auth listener to prevent duplicates
 let authListenerRegistered = false
+
+const saveProviderToken = (token) => {
+  if (token) {
+    localStorage.setItem(PROVIDER_TOKEN_KEY, token)
+  }
+}
+
+const loadProviderToken = () => {
+  return localStorage.getItem(PROVIDER_TOKEN_KEY) || null
+}
+
+const clearProviderToken = () => {
+  localStorage.removeItem(PROVIDER_TOKEN_KEY)
+}
 
 export const useAuthStore = create((set, get) => ({
   user: null,
   role: null, // 'student' | 'admin'
-  providerToken: null, // Google OAuth Token
+  providerToken: loadProviderToken(), // Restore from localStorage immediately
   isLoading: true, // Start true while we check initial session
-  
+
   // Method to check active session on refresh
   checkSession: async () => {
     if (!isSupabaseConfigured) {
@@ -19,7 +36,7 @@ export const useAuthStore = create((set, get) => ({
 
     try {
       const { data: { session }, error } = await supabase.auth.getSession()
-      
+
       if (error) {
         console.warn('Session check error:', error)
       }
@@ -30,26 +47,35 @@ export const useAuthStore = create((set, get) => ({
           .select('id')
           .eq('id', session.user.id)
           .maybeSingle()
+
+        // Use provider_token from session if available, else fall back to localStorage
+        const freshToken = session.provider_token || loadProviderToken()
+        if (session.provider_token) {
+          saveProviderToken(session.provider_token)
+        }
+
         set({
           user: session.user,
           role: adminData ? 'admin' : 'student',
-          providerToken: session.provider_token,
+          providerToken: freshToken,
           isLoading: false
         })
       } else {
+        clearProviderToken()
         set({ user: null, role: null, providerToken: null, isLoading: false })
       }
     } catch (err) {
       console.error('Initial session check failed:', err)
       set({ user: null, role: null, providerToken: null, isLoading: false })
     }
-    
+
     // Only register the auth state listener ONCE globally
     if (!authListenerRegistered) {
       authListenerRegistered = true
       supabase.auth.onAuthStateChange(async (event, session) => {
         console.log('Auth state change:', event)
         if (event === 'SIGNED_OUT') {
+          clearProviderToken()
           set({ user: null, role: null, providerToken: null })
           return
         }
@@ -59,24 +85,35 @@ export const useAuthStore = create((set, get) => ({
             .select('id')
             .eq('id', session.user.id)
             .maybeSingle()
+
+          // Persist fresh token if available
+          if (session.provider_token) {
+            saveProviderToken(session.provider_token)
+          }
+          const token = session.provider_token || loadProviderToken()
+
           set({
             user: session.user,
             role: adminData ? 'admin' : 'student',
-            providerToken: session.provider_token
+            providerToken: token
           })
         } else {
+          clearProviderToken()
           set({ user: null, role: null, providerToken: null })
         }
       })
     }
   },
 
-  setUser: (user, role) => set({ user, role }),
+  setUser: (user, role, providerToken = null) => {
+    if (providerToken) saveProviderToken(providerToken)
+    set({ user, role, providerToken: providerToken || loadProviderToken() })
+  },
   setLoading: (isLoading) => set({ isLoading }),
 
   signIn: async (email, password, isStudent) => {
     if (!isSupabaseConfigured) return { error: 'Database connection missing. Contact administrator.' }
-    
+
     set({ isLoading: true })
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
@@ -111,22 +148,23 @@ export const useAuthStore = create((set, get) => ({
   signInWithOAuth: async (provider) => {
     if (!isSupabaseConfigured) return { error: 'Database connection missing. Contact administrator. Ensure Vercel environment variables are set.' }
 
-    // Don't use global isLoading for OAuth since it redirects away
     try {
       // FORCE SIGN OUT FIRST to clear any stale/stuck sessions
       console.log('Force clearing existing session before OAuth...')
+      clearProviderToken()
       await supabase.auth.signOut()
-      
+
       const options = {
         redirectTo: window.location.origin + '/auth/callback'
       }
 
-      // If logging in with google, restrict to institutional DOMAIN
       if (provider === 'google') {
+        // Request Gmail read-only scope
         options.scopes = 'https://www.googleapis.com/auth/gmail.readonly'
         options.queryParams = {
           prompt: 'select_account',
-          hd: 'pccoepune.org'
+          hd: 'pccoepune.org',
+          access_type: 'offline'
         }
       }
 
@@ -135,15 +173,14 @@ export const useAuthStore = create((set, get) => ({
         provider: provider,
         options: options
       })
-      
+
       if (error) throw error
-      
-      // Explicitly trigger redirect
+
       if (data?.url) {
         console.log('Redirecting to OAuth provider:', data.url)
         window.location.href = data.url
       }
-      
+
       return { success: true, data }
     } catch (error) {
       console.error('OAuth Error:', error)
@@ -156,7 +193,6 @@ export const useAuthStore = create((set, get) => ({
 
     set({ isLoading: true })
     try {
-      // 1. Register with Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -165,7 +201,6 @@ export const useAuthStore = create((set, get) => ({
 
       if (!authData?.user) throw new Error('Failed to retrieve user data.')
 
-      // 2. Create the associated profile record in the database
       const { error: profileError } = await supabase.from('profiles').insert({
         id: authData.user.id,
         email: email,
@@ -187,8 +222,9 @@ export const useAuthStore = create((set, get) => ({
 
   signOut: async () => {
     if (!isSupabaseConfigured) return
-    
+
     set({ isLoading: true })
+    clearProviderToken()
     await supabase.auth.signOut()
     set({ user: null, role: null, providerToken: null, isLoading: false })
   }

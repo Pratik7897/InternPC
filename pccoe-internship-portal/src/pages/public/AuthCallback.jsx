@@ -62,8 +62,15 @@ export default function AuthCallback() {
         .eq('id', currentUser.id)
         .maybeSingle()
 
+      // Save the provider token from the session (it's only available right after OAuth)
+      const providerToken = session.provider_token || null
+      if (providerToken) {
+        localStorage.setItem('gmail_provider_token', providerToken)
+        console.log('Saved Gmail provider token to localStorage.')
+      }
+
       if (adminData) {
-        setUser(currentUser, 'admin')
+        setUser(currentUser, 'admin', providerToken)
         toast.success('Admin login successful')
         navigate('/admin/dashboard', { replace: true })
         return
@@ -94,7 +101,7 @@ export default function AuthCallback() {
       }
 
       // 3. Update global Zustand state and forward to student dashboard
-      setUser(currentUser, 'student')
+      setUser(currentUser, 'student', providerToken)
       toast.success('Login successful! Welcome back.')
       navigate('/student/dashboard', { replace: true })
     }
