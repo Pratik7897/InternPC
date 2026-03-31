@@ -101,8 +101,14 @@ export const useAuthStore = create((set) => ({
         options: options
       })
       
-      console.log('OAuth Response:', { data, error })
+      console.log('OAuth Response Data:', data)
       if (error) throw error
+      
+      // Explicitly trigger redirect if it didn't happen automatically
+      if (data?.url) {
+        console.log('Redirecting to:', data.url)
+        window.location.href = data.url
+      }
       
       return { success: true, data }
     } catch (error) {
