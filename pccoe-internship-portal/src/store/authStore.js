@@ -65,10 +65,9 @@ export const useAuthStore = create((set) => ({
         redirectTo: window.location.origin + '/student/dashboard'
       }
 
-      // If logging in with google, explicitly request permission to read their emails
-      // so we can parse them for internships!
+      // If logging in with google, we previously requested gmail.readonly scope
+      // but this causes Google to block/hang the consent screen for unverified apps!
       if (provider === 'google') {
-        options.scopes = 'https://www.googleapis.com/auth/gmail.readonly'
         options.queryParams = {
           hd: 'pccoepune.org' // Restrict to PCCOE institutional emails
         }
