@@ -146,12 +146,37 @@ export default function ProfileForm() {
         ...payload
       }
       
-      const { error: upsertError } = await supabase
-        .from('profiles')
-        .upsert(finalPayload)
-        
-      if (upsertError) {
-        throw new Error(`Database error: ${upsertError.message}`)
+      // Get current session token for direct REST call (most reliable approach)
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData?.session?.access_token
+      
+      if (!token) {
+        throw new Error('No auth token — please log out and log back in.')
+      }
+
+      console.log('Token obtained, calling Supabase REST for Upsert...')
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+      // Use POST with resolution=merge-duplicates for an explicit Upsert
+      const response = await fetch(
+        `${supabaseUrl}/rest/v1/profiles`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${token}`,
+            'Prefer': 'resolution=merge-duplicates, return=minimal'
+          },
+          body: JSON.stringify(finalPayload)
+        }
+      )
+
+      if (!response.ok) {
+        const errBody = await response.text()
+        throw new Error(`Server error ${response.status}: ${errBody}`)
       }
 
       // Cache to localStorage so refresh shows data instantly without waiting for DB
