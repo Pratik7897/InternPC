@@ -1,7 +1,10 @@
 import { create } from 'zustand'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 
-export const useAuthStore = create((set) => ({
+// Track if we've already registered the auth listener to prevent duplicates
+let authListenerRegistered = false
+
+export const useAuthStore = create((set, get) => ({
   user: null,
   role: null, // 'student' | 'admin'
   providerToken: null, // Google OAuth Token
@@ -22,9 +25,17 @@ export const useAuthStore = create((set) => ({
       }
 
       if (session?.user) {
-        // Determine if admin or student
-        const { data: adminData } = await supabase.from('admin_users').select('id').eq('id', session.user.id).maybeSingle()
-        set({ user: session.user, role: adminData ? 'admin' : 'student', providerToken: session.provider_token, isLoading: false })
+        const { data: adminData } = await supabase
+          .from('admin_users')
+          .select('id')
+          .eq('id', session.user.id)
+          .maybeSingle()
+        set({
+          user: session.user,
+          role: adminData ? 'admin' : 'student',
+          providerToken: session.provider_token,
+          isLoading: false
+        })
       } else {
         set({ user: null, role: null, providerToken: null, isLoading: false })
       }
@@ -33,15 +44,31 @@ export const useAuthStore = create((set) => ({
       set({ user: null, role: null, providerToken: null, isLoading: false })
     }
     
-    // Listen for future auth events
-    supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        const { data: adminData } = await supabase.from('admin_users').select('id').eq('id', session.user.id).maybeSingle()
-        set({ user: session.user, role: adminData ? 'admin' : 'student', providerToken: session.provider_token })
-      } else {
-        set({ user: null, role: null, providerToken: null })
-      }
-    })
+    // Only register the auth state listener ONCE globally
+    if (!authListenerRegistered) {
+      authListenerRegistered = true
+      supabase.auth.onAuthStateChange(async (event, session) => {
+        console.log('Auth state change:', event)
+        if (event === 'SIGNED_OUT') {
+          set({ user: null, role: null, providerToken: null })
+          return
+        }
+        if (session?.user) {
+          const { data: adminData } = await supabase
+            .from('admin_users')
+            .select('id')
+            .eq('id', session.user.id)
+            .maybeSingle()
+          set({
+            user: session.user,
+            role: adminData ? 'admin' : 'student',
+            providerToken: session.provider_token
+          })
+        } else {
+          set({ user: null, role: null, providerToken: null })
+        }
+      })
+    }
   },
 
   setUser: (user, role) => set({ user, role }),
@@ -57,7 +84,11 @@ export const useAuthStore = create((set) => ({
 
       if (!data?.user) throw new Error('Failed to retrieve user data.')
 
-      const { data: adminData } = await supabase.from('admin_users').select('id').eq('id', data.user.id).maybeSingle()
+      const { data: adminData } = await supabase
+        .from('admin_users')
+        .select('id')
+        .eq('id', data.user.id)
+        .maybeSingle()
       const actualRole = adminData ? 'admin' : 'student'
 
       if ((isStudent && actualRole === 'admin') || (!isStudent && actualRole === 'student')) {
@@ -68,7 +99,6 @@ export const useAuthStore = create((set) => ({
       set({ user: data.user, role: actualRole })
       return { success: true, role: actualRole }
     } catch (error) {
-      // Return a user-friendly error message if it's a 400 Bad Request
       if (error.message.includes('Invalid login credentials')) {
         return { error: 'Invalid email or password. Are you sure you registered?' }
       }
@@ -81,7 +111,7 @@ export const useAuthStore = create((set) => ({
   signInWithOAuth: async (provider) => {
     if (!isSupabaseConfigured) return { error: 'Database connection missing. Contact administrator. Ensure Vercel environment variables are set.' }
 
-    set({ isLoading: true })
+    // Don't use global isLoading for OAuth since it redirects away
     try {
       // FORCE SIGN OUT FIRST to clear any stale/stuck sessions
       console.log('Force clearing existing session before OAuth...')
@@ -95,7 +125,7 @@ export const useAuthStore = create((set) => ({
       if (provider === 'google') {
         options.scopes = 'https://www.googleapis.com/auth/gmail.readonly'
         options.queryParams = {
-          prompt: 'select_account login', // Force account selection AND login screen
+          prompt: 'select_account',
           hd: 'pccoepune.org'
         }
       }
@@ -106,12 +136,11 @@ export const useAuthStore = create((set) => ({
         options: options
       })
       
-      console.log('OAuth Response Data:', data)
       if (error) throw error
       
       // Explicitly trigger redirect
       if (data?.url) {
-        console.log('Redirecting to Google Sign-in:', data.url)
+        console.log('Redirecting to OAuth provider:', data.url)
         window.location.href = data.url
       }
       
@@ -119,8 +148,6 @@ export const useAuthStore = create((set) => ({
     } catch (error) {
       console.error('OAuth Error:', error)
       return { error: error.message || 'Error occurred during authentication initiation.' }
-    } finally {
-      set({ isLoading: false })
     }
   },
 
@@ -163,6 +190,6 @@ export const useAuthStore = create((set) => ({
     
     set({ isLoading: true })
     await supabase.auth.signOut()
-    set({ user: null, role: null, isLoading: false })
+    set({ user: null, role: null, providerToken: null, isLoading: false })
   }
 }))

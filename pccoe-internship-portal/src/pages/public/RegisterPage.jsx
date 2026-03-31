@@ -9,6 +9,7 @@ import { Input } from '../../components/ui/Input'
 import { Label } from '../../components/ui/Label'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../../store/authStore'
+import { isSupabaseConfigured } from '../../lib/supabase'
 
 const registerSchema = z.object({
   fullName: z.string().min(2, "Name must be at least 2 characters"),
@@ -188,9 +189,9 @@ export default function RegisterPage() {
               variant="outline" 
               className="glass border-white/10 hover:bg-white/5 gap-2"
               onClick={async () => {
-                const res = await useAuthStore.getState().signInWithOAuth('github')
+                const res = await signInWithOAuth('github')
                 if (res && res.error) {
-                  import('react-hot-toast').then(t => t.default.error(res.error))
+                  toast.error(res.error)
                 }
               }}
             >

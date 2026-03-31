@@ -48,7 +48,8 @@ function App() {
 
   useEffect(() => {
     checkSession()
-  }, [checkSession])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   if (isLoading) {
     return (

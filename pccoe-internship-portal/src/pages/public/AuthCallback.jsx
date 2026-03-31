@@ -6,7 +6,7 @@ import toast from 'react-hot-toast'
 
 export default function AuthCallback() {
   const navigate = useNavigate()
-  const { checkSession, user } = useAuthStore()
+  const setUser = useAuthStore(state => state.setUser)
   const [status, setStatus] = useState('Authenticating...')
 
   useEffect(() => {
@@ -23,63 +23,26 @@ export default function AuthCallback() {
     const processAuth = async () => {
       try {
         setStatus('Verifying session details...')
+        
+        // Small delay to allow Supabase to exchange the code for a session
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
         const { data: { session }, error } = await supabase.auth.getSession()
 
         if (error) throw error
 
         if (!session?.user) {
-          throw new Error('No user session found after login.')
-        }
-
-        const currentUser = session.user
-        
-        setStatus('Checking profile status...')
-        
-        // 1. Is this user an Admin?
-        const { data: adminData } = await supabase
-          .from('admin_users')
-          .select('id')
-          .eq('id', currentUser.id)
-          .maybeSingle()
-
-        if (adminData) {
-          // Sync store immediately and redirect admin
-          await checkSession()
-          toast.success('Admin login successful')
-          navigate('/admin/dashboard', { replace: true })
-          return
-        }
-
-        // 2. If Student, ensure they have a profile row
-        // Because OAuth does not automatically fire database triggers natively here
-        setStatus('Syncing student profile...')
-        
-        const { data: existingProfile } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('id', currentUser.id)
-          .maybeSingle()
-
-        if (!existingProfile) {
-          // Create the foundational profile row for the new OAuth user
-          const { error: insertError } = await supabase.from('profiles').insert({
-            id: currentUser.id,
-            email: currentUser.email,
-            full_name: currentUser.user_metadata?.full_name || '',
-            profile_completion: 0
-          })
-
-          if (insertError) {
-            console.error('Failed to create profile row:', insertError)
-            throw new Error('Could not synchronize student profile.')
+          // Sometimes the session exchange takes a moment; try once more
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          const { data: { session: retrySession }, error: retryError } = await supabase.auth.getSession()
+          if (retryError || !retrySession?.user) {
+            throw new Error('No user session found after login. Please try again.')
           }
+          // Use retry session
+          return handleSession(retrySession)
         }
 
-        // 3. Sync global Zustand state and forward to student dashboard
-        await checkSession()
-        toast.success('Login successful')
-        navigate('/student/dashboard', { replace: true })
-
+        return handleSession(session)
       } catch (err) {
         console.error('Callback error:', err)
         toast.error(err.message || 'Error occurred during login synchronization.')
@@ -87,8 +50,57 @@ export default function AuthCallback() {
       }
     }
 
+    const handleSession = async (session) => {
+      const currentUser = session.user
+      
+      setStatus('Checking profile status...')
+      
+      // 1. Is this user an Admin?
+      const { data: adminData } = await supabase
+        .from('admin_users')
+        .select('id')
+        .eq('id', currentUser.id)
+        .maybeSingle()
+
+      if (adminData) {
+        setUser(currentUser, 'admin')
+        toast.success('Admin login successful')
+        navigate('/admin/dashboard', { replace: true })
+        return
+      }
+
+      // 2. If Student, ensure they have a profile row
+      setStatus('Syncing student profile...')
+      
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', currentUser.id)
+        .maybeSingle()
+
+      if (!existingProfile) {
+        // Create the foundational profile row for the new OAuth user
+        const { error: insertError } = await supabase.from('profiles').insert({
+          id: currentUser.id,
+          email: currentUser.email,
+          full_name: currentUser.user_metadata?.full_name || '',
+          profile_completion: 0
+        })
+
+        if (insertError && insertError.code !== '23505') {
+          // 23505 = unique violation (profile already exists), ignore it
+          console.error('Failed to create profile row:', insertError)
+        }
+      }
+
+      // 3. Update global Zustand state and forward to student dashboard
+      setUser(currentUser, 'student')
+      toast.success('Login successful! Welcome back.')
+      navigate('/student/dashboard', { replace: true })
+    }
+
     processAuth()
-  }, [navigate, checkSession])
+  }, [navigate, setUser])
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">

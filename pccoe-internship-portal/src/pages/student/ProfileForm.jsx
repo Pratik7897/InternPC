@@ -123,6 +123,7 @@ export default function ProfileForm() {
         gender: formData.gender || null,
         linkedin_url: formData.linkedin || null,
         github_url: formData.github || null,
+        prn_number: formData.prn || null,
         branch: formData.branch || null,
         current_year: formData.year || null,
         cgpa: formData.cgpa ? parseFloat(formData.cgpa) : null,

@@ -19,8 +19,11 @@ export default function BrowseInternships() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    fetchInternships()
-  }, [])
+    if (user) {
+      fetchInternships()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, providerToken])
 
   const fetchInternships = async () => {
     setIsLoading(true)

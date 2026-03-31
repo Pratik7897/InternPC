@@ -1,8 +1,9 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, User, UploadCloud, Briefcase, FileText, Bell, LogOut, X } from 'lucide-react'
-import { useState } from 'react'
+import { LayoutDashboard, User, UploadCloud, Briefcase, FileText, Bell, LogOut } from 'lucide-react'
+import { useState, useEffect } from 'react'
 import { cn } from '../../lib/utils'
 import { useAuthStore } from '../../store/authStore'
+import { supabase } from '../../lib/supabase'
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/student/dashboard' },
@@ -14,9 +15,26 @@ const navItems = [
 ]
 
 export default function StudentSidebar() {
-  const { signOut } = useAuthStore()
+  const { signOut, user } = useAuthStore()
+  const [completionPercentage, setCompletionPercentage] = useState(0)
+
+  useEffect(() => {
+    if (!user) return
+    const fetchCompletion = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('profile_completion')
+        .eq('id', user.id)
+        .maybeSingle()
+      if (data?.profile_completion != null) {
+        setCompletionPercentage(data.profile_completion)
+      }
+    }
+    fetchCompletion()
+  }, [user])
+
   return (
-    <div className="w-64 border-r border-white/10 bg-tertiary hidden md:flex flex-col h-full object-contain">
+    <div className="w-64 border-r border-white/10 bg-tertiary hidden md:flex flex-col h-full">
       <div className="p-6">
         <h1 className="text-2xl font-heading font-bold text-accent-blue tracking-tight">PCCOE</h1>
         <p className="text-xs text-text-secondary mt-1">Student Portal</p>
@@ -29,10 +47,10 @@ export default function StudentSidebar() {
             to={item.path}
             className={({ isActive }) =>
               cn(
-                "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-sm font-medium",
+                'flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-sm font-medium',
                 isActive
-                  ? "bg-accent-blue/10 text-accent-blue border-l-2 border-accent-blue shadow-[var(--glow)]"
-                  : "text-text-secondary hover:bg-white/5 hover:text-text-primary"
+                  ? 'bg-accent-blue/10 text-accent-blue border-l-2 border-accent-blue shadow-[var(--glow)]'
+                  : 'text-text-secondary hover:bg-white/5 hover:text-text-primary'
               )
             }
           >
@@ -54,16 +72,18 @@ export default function StudentSidebar() {
                 d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
               />
               <path
-                className="text-accent-blue"
+                className="text-accent-blue transition-all duration-700"
                 strokeWidth="3"
-                strokeDasharray="40, 100"
+                strokeDasharray={`${completionPercentage}, 100`}
                 strokeLinecap="round"
                 stroke="currentColor"
                 fill="none"
                 d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
               />
             </svg>
-            <div className="absolute inset-0 flex items-center justify-center text-xs font-bold">40%</div>
+            <div className="absolute inset-0 flex items-center justify-center text-xs font-bold">
+              {completionPercentage}%
+            </div>
           </div>
           <p className="text-xs text-text-secondary">Profile Completion</p>
         </div>
