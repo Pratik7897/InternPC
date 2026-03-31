@@ -83,15 +83,19 @@ export const useAuthStore = create((set) => ({
 
     set({ isLoading: true })
     try {
+      // FORCE SIGN OUT FIRST to clear any stale/stuck sessions
+      console.log('Force clearing existing session before OAuth...')
+      await supabase.auth.signOut()
+      
       const options = {
         redirectTo: window.location.origin + '/auth/callback'
       }
 
       // If logging in with google, restrict to institutional DOMAIN
-      // DO NOT use options.scopes for gmail.readonly as it locks unverified apps
       if (provider === 'google') {
         options.queryParams = {
-          hd: 'pccoepune.org' // Restrict to PCCOE institutional emails
+          prompt: 'select_account login', // Force account selection AND login screen
+          hd: 'pccoepune.org'
         }
       }
 
@@ -104,9 +108,9 @@ export const useAuthStore = create((set) => ({
       console.log('OAuth Response Data:', data)
       if (error) throw error
       
-      // Explicitly trigger redirect if it didn't happen automatically
+      // Explicitly trigger redirect
       if (data?.url) {
-        console.log('Redirecting to:', data.url)
+        console.log('Redirecting to Google Sign-in:', data.url)
         window.location.href = data.url
       }
       
