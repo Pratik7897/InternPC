@@ -70,7 +70,8 @@ export const useAuthStore = create((set) => ({
       if (provider === 'google') {
         options.scopes = 'https://www.googleapis.com/auth/gmail.readonly'
         options.queryParams = {
-          prompt: 'consent' // Forces Google to actually ask for the new scope
+          prompt: 'consent', // Forces Google to actually ask for the new scope
+          hd: 'pccoepune.org' // Restrict to PCCOE institutional emails
         }
       }
 
