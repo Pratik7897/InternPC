@@ -93,6 +93,7 @@ export const useAuthStore = create((set) => ({
 
       // If logging in with google, restrict to institutional DOMAIN
       if (provider === 'google') {
+        options.scopes = 'https://www.googleapis.com/auth/gmail.readonly'
         options.queryParams = {
           prompt: 'select_account login', // Force account selection AND login screen
           hd: 'pccoepune.org'
