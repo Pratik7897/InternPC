@@ -13,6 +13,7 @@ import RegisterPage from './pages/public/RegisterPage'
 import DirectoryPage from './pages/public/DirectoryPage'
 import StudentProfilePublicPage from './pages/public/StudentProfilePublicPage'
 import InternshipsPublicPage from './pages/public/InternshipsPublicPage'
+import AuthCallback from './pages/public/AuthCallback'
 
 // Student Pages
 import StudentDashboard from './pages/student/StudentDashboard'
@@ -66,6 +67,7 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/directory" element={<DirectoryPage />} />
         <Route path="/directory/:student_id" element={<StudentProfilePublicPage />} />
         <Route path="/internships" element={<InternshipsPublicPage />} />

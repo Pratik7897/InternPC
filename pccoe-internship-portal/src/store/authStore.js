@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { supabase } from '../lib/supabase'
+import { supabase, isSupabaseConfigured } from '../lib/supabase'
 
 export const useAuthStore = create((set) => ({
   user: null,
@@ -9,17 +9,33 @@ export const useAuthStore = create((set) => ({
   
   // Method to check active session on refresh
   checkSession: async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (session) {
-      // Determine if admin or student
-      const { data: adminData } = await supabase.from('admin_users').select('id').eq('id', session.user.id).maybeSingle()
-      set({ user: session.user, role: adminData ? 'admin' : 'student', providerToken: session.provider_token, isLoading: false })
-    } else {
+    if (!isSupabaseConfigured) {
+      set({ user: null, role: null, providerToken: null, isLoading: false })
+      return
+    }
+
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession()
+      
+      if (error) {
+        console.warn('Session check error:', error)
+      }
+
+      if (session?.user) {
+        // Determine if admin or student
+        const { data: adminData } = await supabase.from('admin_users').select('id').eq('id', session.user.id).maybeSingle()
+        set({ user: session.user, role: adminData ? 'admin' : 'student', providerToken: session.provider_token, isLoading: false })
+      } else {
+        set({ user: null, role: null, providerToken: null, isLoading: false })
+      }
+    } catch (err) {
+      console.error('Initial session check failed:', err)
       set({ user: null, role: null, providerToken: null, isLoading: false })
     }
     
+    // Listen for future auth events
     supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session) {
+      if (session?.user) {
         const { data: adminData } = await supabase.from('admin_users').select('id').eq('id', session.user.id).maybeSingle()
         set({ user: session.user, role: adminData ? 'admin' : 'student', providerToken: session.provider_token })
       } else {
@@ -32,10 +48,14 @@ export const useAuthStore = create((set) => ({
   setLoading: (isLoading) => set({ isLoading }),
 
   signIn: async (email, password, isStudent) => {
+    if (!isSupabaseConfigured) return { error: 'Database connection missing. Contact administrator.' }
+    
     set({ isLoading: true })
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
+
+      if (!data?.user) throw new Error('Failed to retrieve user data.')
 
       const { data: adminData } = await supabase.from('admin_users').select('id').eq('id', data.user.id).maybeSingle()
       const actualRole = adminData ? 'admin' : 'student'
@@ -59,33 +79,43 @@ export const useAuthStore = create((set) => ({
   },
 
   signInWithOAuth: async (provider) => {
+    if (!isSupabaseConfigured) return { error: 'Database connection missing. Contact administrator. Ensure Vercel environment variables are set.' }
+
     set({ isLoading: true })
     try {
       const options = {
-        redirectTo: window.location.origin + '/student/dashboard'
+        redirectTo: window.location.origin + '/auth/callback'
       }
 
-      // If logging in with google, we previously requested gmail.readonly scope
-      // but this causes Google to block/hang the consent screen for unverified apps!
+      // If logging in with google, restrict to institutional DOMAIN
+      // DO NOT use options.scopes for gmail.readonly as it locks unverified apps
       if (provider === 'google') {
         options.queryParams = {
           hd: 'pccoepune.org' // Restrict to PCCOE institutional emails
         }
       }
 
+      console.log('Initiating OAuth login...', { provider, options })
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: provider,
         options: options
       })
+      
+      console.log('OAuth Response:', { data, error })
       if (error) throw error
+      
+      return { success: true, data }
     } catch (error) {
-      return { error: error.message }
+      console.error('OAuth Error:', error)
+      return { error: error.message || 'Error occurred during authentication initiation.' }
     } finally {
       set({ isLoading: false })
     }
   },
 
   signUp: async (email, password, fullName, prnNumber, branch, currentYear) => {
+    if (!isSupabaseConfigured) return { error: 'Database connection missing. Contact administrator.' }
+
     set({ isLoading: true })
     try {
       // 1. Register with Supabase Auth
@@ -95,18 +125,19 @@ export const useAuthStore = create((set) => ({
       })
       if (authError) throw authError
 
+      if (!authData?.user) throw new Error('Failed to retrieve user data.')
+
       // 2. Create the associated profile record in the database
-      if (authData.user) {
-        const { error: profileError } = await supabase.from('profiles').insert({
-          id: authData.user.id,
-          email: email,
-          full_name: fullName,
-          prn_number: prnNumber,
-          branch: branch,
-          current_year: currentYear
-        })
-        if (profileError) throw profileError
-      }
+      const { error: profileError } = await supabase.from('profiles').insert({
+        id: authData.user.id,
+        email: email,
+        full_name: fullName,
+        prn_number: prnNumber,
+        branch: branch,
+        current_year: currentYear
+      })
+
+      if (profileError) throw profileError
 
       return { success: true }
     } catch (error) {
@@ -117,6 +148,8 @@ export const useAuthStore = create((set) => ({
   },
 
   signOut: async () => {
+    if (!isSupabaseConfigured) return
+    
     set({ isLoading: true })
     await supabase.auth.signOut()
     set({ user: null, role: null, isLoading: false })
