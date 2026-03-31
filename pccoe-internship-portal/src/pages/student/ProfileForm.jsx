@@ -140,37 +140,18 @@ export default function ProfileForm() {
       console.log('Saving profile for user:', user.id)
       console.log('Payload:', payload)
 
-      // Get current session token for direct REST call (most reliable approach)
-      const { data: sessionData } = await supabase.auth.getSession()
-      const token = sessionData?.session?.access_token
-      
-      if (!token) {
-        throw new Error('No auth token — please log out and log back in.')
+      const finalPayload = {
+        id: user.id,
+        email: user.email,
+        ...payload
       }
-
-      console.log('Token obtained, calling Supabase REST...')
-
-      // Use direct fetch to Supabase REST API — more reliable than the JS client for updates
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-
-      const response = await fetch(
-        `${supabaseUrl}/rest/v1/profiles?id=eq.${user.id}`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${token}`,
-            'Prefer': 'return=minimal'
-          },
-          body: JSON.stringify(payload)
-        }
-      )
-
-      if (!response.ok) {
-        const errBody = await response.text()
-        throw new Error(`Server error ${response.status}: ${errBody}`)
+      
+      const { error: upsertError } = await supabase
+        .from('profiles')
+        .upsert(finalPayload)
+        
+      if (upsertError) {
+        throw new Error(`Database error: ${upsertError.message}`)
       }
 
       // Cache to localStorage so refresh shows data instantly without waiting for DB
