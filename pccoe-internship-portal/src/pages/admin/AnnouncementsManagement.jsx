@@ -1,44 +1,92 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Megaphone, Plus, Trash2, Clock } from 'lucide-react'
+import { Megaphone, Plus, Trash2, Clock, Loader2 } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
 import { Input } from '../../components/ui/Input'
 import toast from 'react-hot-toast'
-
-const mockAnnouncements = [
-  { id: '1', title: 'Resume Review Workshop', content: 'Join us on Friday at 3PM in the main auditorium for a resume building session by industry experts.', date: 'Oct 20, 2026', type: 'event' },
-  { id: '2', title: 'TCS Ninja Hiring 2026 Batch', content: 'TCS is visiting next week. Ensure your profile is 100% complete and you have applied through the portal.', date: 'Oct 19, 2026', type: 'urgent' },
-  { id: '3', title: 'New Mock Assessment Links', content: 'The aptitude test links have been mailed to all registered students. Deadline to complete is Sunday.', date: 'Oct 15, 2026', type: 'info' }
-]
+import { supabase } from '../../lib/supabase'
+import { useAuthStore } from '../../store/authStore'
 
 export default function AnnouncementsManagement() {
-  const [announcements, setAnnouncements] = useState(mockAnnouncements)
+  const { user } = useAuthStore()
+  const [announcements, setAnnouncements] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isPosting, setIsPosting] = useState(false)
   const [isComposing, setIsComposing] = useState(false)
 
   const [newTitle, setNewTitle] = useState('')
   const [newContent, setNewContent] = useState('')
   const [newType, setNewType] = useState('info')
 
-  const handlePost = (e) => {
-    e.preventDefault()
-    const newAnn = {
-      id: Date.now().toString(),
-      title: newTitle,
-      content: newContent,
-      date: 'Just now',
-      type: newType
+  useEffect(() => {
+    fetchAnnouncements()
+  }, [])
+
+  const fetchAnnouncements = async () => {
+    setIsLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('announcements')
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      setAnnouncements(data || [])
+    } catch (err) {
+      console.error('Fetch announcements error:', err)
+      toast.error('Failed to load announcements')
+    } finally {
+      setIsLoading(false)
     }
-    setAnnouncements([newAnn, ...announcements])
-    setIsComposing(false)
-    setNewTitle('')
-    setNewContent('')
-    toast.success('Announcement published globally.')
   }
 
-  const handleDelete = (id) => {
-    setAnnouncements(announcements.filter(a => a.id !== id))
-    toast.success('Announcement removed.')
+  const handlePost = async (e) => {
+    e.preventDefault()
+    if (!newTitle.trim() || !newContent.trim()) return
+    setIsPosting(true)
+    try {
+      const { data, error } = await supabase
+        .from('announcements')
+        .insert({
+          title: newTitle.trim(),
+          content: newContent.trim(),
+          type: newType,
+          posted_by: user?.id
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      setAnnouncements([data, ...announcements])
+      setIsComposing(false)
+      setNewTitle('')
+      setNewContent('')
+      setNewType('info')
+      toast.success('Announcement published globally.')
+    } catch (err) {
+      console.error('Post announcement error:', err)
+      toast.error('Failed to publish: ' + (err.message || 'Check Supabase permissions'))
+    } finally {
+      setIsPosting(false)
+    }
+  }
+
+  const handleDelete = async (id) => {
+    try {
+      const { error } = await supabase.from('announcements').delete().eq('id', id)
+      if (error) throw error
+      setAnnouncements(announcements.filter(a => a.id !== id))
+      toast.success('Announcement removed.')
+    } catch (err) {
+      console.error('Delete announcement error:', err)
+      toast.error('Failed to delete announcement')
+    }
+  }
+
+  const formatDate = (iso) => {
+    if (!iso) return ''
+    return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
   }
 
   return (
@@ -87,40 +135,53 @@ export default function AnnouncementsManagement() {
             ></textarea>
             
             <div className="flex justify-end gap-3 pt-2">
-              <Button type="button" variant="ghost" onClick={() => setIsComposing(false)}>Cancel</Button>
-              <Button type="submit" className="shadow-[var(--glow)]">Publish to Ticker</Button>
+              <Button type="button" variant="ghost" onClick={() => { setIsComposing(false); setNewTitle(''); setNewContent('') }} disabled={isPosting}>Cancel</Button>
+              <Button type="submit" className="shadow-[var(--glow)] gap-2" disabled={isPosting}>
+                {isPosting ? <><Loader2 className="w-4 h-4 animate-spin" /> Publishing...</> : 'Publish to Ticker'}
+              </Button>
             </div>
           </form>
         </motion.div>
       )}
 
-      <div className="space-y-4">
-        {announcements.map((ann, i) => (
-          <motion.div 
-            key={ann.id}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: i * 0.1 }}
-            className={`glass-card p-6 flex gap-5 border-l-4 ${ann.type === 'urgent' ? 'border-red-500' : ann.type === 'event' ? 'border-accent-gold' : 'border-accent-blue'}`}
-          >
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <h3 className="text-lg font-bold font-heading">{ann.title}</h3>
-                <Badge variant={ann.type === 'urgent' ? 'destructive' : 'outline'} className="text-[10px] uppercase tracking-wider py-0 leading-tight bg-white/5">
-                  {ann.type}
-                </Badge>
+      {isLoading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-accent-blue" />
+        </div>
+      ) : announcements.length === 0 ? (
+        <div className="text-center py-20 text-text-secondary">
+          <Megaphone className="w-12 h-12 mx-auto mb-4 opacity-20" />
+          <p>No announcements yet. Create your first broadcast!</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {announcements.map((ann, i) => (
+            <motion.div 
+              key={ann.id}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.05 }}
+              className={`glass-card p-6 flex gap-5 border-l-4 ${ann.type === 'urgent' ? 'border-red-500' : ann.type === 'event' ? 'border-accent-gold' : 'border-accent-blue'}`}
+            >
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <h3 className="text-lg font-bold font-heading">{ann.title}</h3>
+                  <Badge variant={ann.type === 'urgent' ? 'destructive' : 'outline'} className="text-[10px] uppercase tracking-wider py-0 leading-tight bg-white/5">
+                    {ann.type}
+                  </Badge>
+                </div>
+                <p className="text-text-secondary text-sm leading-relaxed mb-4">{ann.content}</p>
+                <div className="text-xs text-text-secondary flex items-center gap-2">
+                  <Clock className="w-3 h-3" /> Broadcasted: {formatDate(ann.created_at)}
+                </div>
               </div>
-              <p className="text-text-secondary text-sm leading-relaxed mb-4">{ann.content}</p>
-              <div className="text-xs text-text-secondary flex items-center gap-2">
-                <Clock className="w-3 h-3" /> Broadcasted: {ann.date}
-              </div>
-            </div>
-            <button onClick={() => handleDelete(ann.id)} className="shrink-0 p-2 text-text-secondary hover:text-red-400 hover:bg-red-400/10 rounded-lg h-fit transition-colors">
-              <Trash2 className="w-5 h-5"/>
-            </button>
-          </motion.div>
-        ))}
-      </div>
+              <button onClick={() => handleDelete(ann.id)} className="shrink-0 p-2 text-text-secondary hover:text-red-400 hover:bg-red-400/10 rounded-lg h-fit transition-colors">
+                <Trash2 className="w-5 h-5"/>
+              </button>
+            </motion.div>
+          ))}
+        </div>
+      )}
 
     </div>
   )

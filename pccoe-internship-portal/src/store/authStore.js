@@ -169,8 +169,8 @@ export const useAuthStore = create((set, get) => ({
       }
 
       if (provider === 'google') {
-        // Only request basic profile/email scopes (no sensitive permissions)
-        // This allows the OAuth app to be published without Google verification
+        // Request gmail.readonly scope so we can fetch internship emails
+        options.scopes = 'email profile openid https://www.googleapis.com/auth/gmail.readonly'
         options.queryParams = {
           prompt: 'select_account',
           hd: 'pccoepune.org',

@@ -1,18 +1,20 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, MapPin, DollarSign, Briefcase, X, ChevronRight, RefreshCw, EyeOff, Eye, Mail, ExternalLink } from 'lucide-react'
+import { Search, MapPin, DollarSign, Briefcase, X, ChevronRight, RefreshCw, EyeOff, Eye, Mail, ExternalLink, AlertCircle } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
 import { Input } from '../../components/ui/Input'
 import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
+import { fetchGmailInternships } from '../../lib/gmail'
 
 export default function BrowseInternships() {
-  const { user } = useAuthStore()
+  const { user, providerToken } = useAuthStore()
   const [search, setSearch] = useState('')
   const HIDDEN_KEY = `hidden_internships_${user?.id}`
-  const [internships, setInternships] = useState([])
+  const [portalJobs, setPortalJobs] = useState([])
+  const [gmailJobs, setGmailJobs] = useState([])
   const [hiddenJobs, setHiddenJobs] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem(`hidden_internships_${user?.id}`) || '[]')) }
     catch { return new Set() }
@@ -20,32 +22,24 @@ export default function BrowseInternships() {
   const [appliedJobs, setAppliedJobs] = useState(new Set())
   const [selectedJob, setSelectedJob] = useState(null)
   const [coverNote, setCoverNote] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
-  const [activeFilter, setActiveFilter] = useState('all') // 'all' | 'portal' | 'hidden'
+  const [isLoadingPortal, setIsLoadingPortal] = useState(true)
+  const [isLoadingGmail, setIsLoadingGmail] = useState(false)
+  const [activeFilter, setActiveFilter] = useState('all') // 'all' | 'portal' | 'gmail' | 'hidden'
 
-  useEffect(() => {
-    if (user) {
-      fetchInternships()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id])
-
-  const fetchInternships = async () => {
-    setIsLoading(true)
+  const fetchPortalInternships = useCallback(async () => {
+    if (!user) return
+    setIsLoadingPortal(true)
     try {
-      // Fetch all internships (including those where is_active is null — newly posted ones)
       const { data: jobsData, error: jobsError } = await supabase
         .from('internships')
         .select('*')
         .order('created_at', { ascending: false })
 
-      console.log('[Internships] fetched:', jobsData?.length ?? 0, jobsError)
       if (jobsError) {
         console.error('[Internships] Supabase error:', jobsError)
         throw jobsError
       }
 
-      // Fetch student's existing applications
       const { data: appliedData, error: appliedError } = await supabase
         .from('applications')
         .select('internship_id')
@@ -54,12 +48,53 @@ export default function BrowseInternships() {
       if (appliedError) console.warn('[Applications] fetch error:', appliedError)
 
       setAppliedJobs(new Set((appliedData || []).map(app => app.internship_id)))
-      setInternships(jobsData || [])
+      setPortalJobs(jobsData || [])
     } catch (error) {
-      toast.error('Failed to load internships. Check your connection.')
-      console.error('[BrowseInternships] Error:', error)
+      toast.error('Failed to load portal internships. Check your connection.')
+      console.error('[BrowseInternships] Portal Error:', error)
     } finally {
-      setIsLoading(false)
+      setIsLoadingPortal(false)
+    }
+  }, [user])
+
+  const fetchGmail = useCallback(async (token) => {
+    if (!token) {
+      console.log('[Gmail] No provider token available, skipping Gmail fetch.')
+      return
+    }
+    setIsLoadingGmail(true)
+    try {
+      const emails = await fetchGmailInternships(token)
+      setGmailJobs(emails)
+      if (emails.length > 0) {
+        console.log(`[Gmail] Loaded ${emails.length} internship emails.`)
+      }
+    } catch (err) {
+      console.error('[Gmail] Error fetching internships:', err)
+    } finally {
+      setIsLoadingGmail(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (user) {
+      fetchPortalInternships()
+      // Use providerToken from store (saved in localStorage after OAuth login)
+      const token = providerToken || localStorage.getItem('gmail_provider_token')
+      if (token) {
+        fetchGmail(token)
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id])
+
+  const handleRefresh = async () => {
+    await fetchPortalInternships()
+    const token = providerToken || localStorage.getItem('gmail_provider_token')
+    if (token) {
+      await fetchGmail(token)
+    } else {
+      toast('No Gmail token — sign out and re-login with Google to enable Gmail sync.', { icon: 'ℹ️' })
     }
   }
 
@@ -90,24 +125,45 @@ export default function BrowseInternships() {
     toast('Internship hidden. You can restore it anytime.', { icon: '🙈' })
   }
 
+  const restoreJob = (e, jobId) => {
+    e.stopPropagation()
+    const updated = new Set(hiddenJobs)
+    updated.delete(jobId)
+    setHiddenJobs(updated)
+    localStorage.setItem(HIDDEN_KEY, JSON.stringify([...updated]))
+    toast.success('Internship restored!')
+  }
+
   const unhideAll = () => {
     setHiddenJobs(new Set())
     localStorage.removeItem(HIDDEN_KEY)
     setActiveFilter('all')
     toast.success('All hidden internships restored!')
   }
-  // Split visible vs hidden
-  const visibleInternships = internships.filter(job => !hiddenJobs.has(job.id))
-  const hiddenInternships = internships.filter(job => hiddenJobs.has(job.id))
 
-  const filteredInternships = (activeFilter === 'hidden' ? hiddenInternships : visibleInternships).filter(job => {
-    const matchSearch =
-      job.title?.toLowerCase().includes(search.toLowerCase()) ||
-      job.company_name?.toLowerCase().includes(search.toLowerCase())
-    return matchSearch
+  // All jobs combined (portal + gmail), excluding hidden ones
+  const allJobs = [...portalJobs, ...gmailJobs]
+  const visibleJobs = allJobs.filter(job => !hiddenJobs.has(job.id))
+  const hiddenJobsList = allJobs.filter(job => hiddenJobs.has(job.id))
+
+  const getFilteredList = () => {
+    if (activeFilter === 'hidden') return hiddenJobsList
+    if (activeFilter === 'portal') return portalJobs.filter(job => !hiddenJobs.has(job.id))
+    if (activeFilter === 'gmail') return gmailJobs.filter(job => !hiddenJobs.has(job.id))
+    return visibleJobs // 'all'
+  }
+
+  const filteredInternships = getFilteredList().filter(job => {
+    const q = search.toLowerCase()
+    return (
+      job.title?.toLowerCase().includes(q) ||
+      job.company_name?.toLowerCase().includes(q)
+    )
   })
 
-  const portalCount = visibleInternships.length
+  const isLoading = isLoadingPortal // Gmail loads independently
+
+  const hasToken = !!(providerToken || localStorage.getItem('gmail_provider_token'))
 
   return (
     <div className="space-y-6">
@@ -116,7 +172,7 @@ export default function BrowseInternships() {
         <div>
           <h1 className="text-3xl font-heading font-bold text-text-primary">Browse Internships</h1>
           <p className="text-text-secondary mt-1">
-            Discover opportunities posted on the portal.
+            Discover opportunities from the portal{hasToken ? ' and your Gmail inbox' : ''}.
           </p>
         </div>
         <div className="flex gap-3">
@@ -131,24 +187,36 @@ export default function BrowseInternships() {
           </div>
           <Button
             variant="outline"
-            onClick={fetchInternships}
-            disabled={isLoading}
+            onClick={handleRefresh}
+            disabled={isLoadingPortal || isLoadingGmail}
             className="gap-2 shrink-0"
           >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${(isLoadingPortal || isLoadingGmail) ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>
       </div>
 
-
+      {/* Gmail notice if no token */}
+      {!hasToken && (
+        <div className="flex items-start gap-3 p-4 bg-accent-blue/10 border border-accent-blue/20 rounded-xl text-sm text-accent-blue">
+          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold mb-0.5">Gmail Sync Unavailable</p>
+            <p className="text-text-secondary">
+              Sign out and re-login with your Google account to also see internship emails from your Gmail inbox.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Filter Tabs */}
       <div className="flex items-center gap-2 flex-wrap justify-between">
         <div className="flex gap-2 flex-wrap">
           {[
-            { key: 'all', label: `All (${visibleInternships.length})` },
-            { key: 'portal', label: `Portal (${portalCount})` },
+            { key: 'all', label: `All (${visibleJobs.length})` },
+            { key: 'portal', label: `Portal (${portalJobs.filter(j => !hiddenJobs.has(j.id)).length})` },
+            ...(hasToken ? [{ key: 'gmail', label: `Gmail${isLoadingGmail ? ' ⟳' : ` (${gmailJobs.filter(j => !hiddenJobs.has(j.id)).length})`}` }] : []),
             ...(hiddenJobs.size > 0 ? [{ key: 'hidden', label: `Hidden (${hiddenJobs.size})` }] : [])
           ].map(tab => (
             <button
@@ -158,7 +226,9 @@ export default function BrowseInternships() {
                 activeFilter === tab.key
                   ? tab.key === 'hidden'
                     ? 'bg-white/20 text-white'
-                    : 'bg-accent-blue text-white shadow-[var(--glow)]'
+                    : tab.key === 'gmail'
+                      ? 'bg-blue-500/30 text-blue-300 shadow-[0_0_10px_rgba(59,130,246,0.2)]'
+                      : 'bg-accent-blue text-white shadow-[var(--glow)]'
                   : 'bg-white/5 text-text-secondary hover:bg-white/10 hover:text-white border border-white/10'
               }`}
             >
@@ -192,12 +262,16 @@ export default function BrowseInternships() {
                 ? `No results for "${search}"`
                 : activeFilter === 'hidden'
                   ? 'No hidden internships.'
-                  : 'No internships available right now.'}
+                  : activeFilter === 'gmail'
+                    ? isLoadingGmail ? 'Loading Gmail internships...' : 'No internship emails found in your Gmail inbox.'
+                    : 'No internships available right now.'}
             </p>
             <p className="text-text-secondary text-sm mt-2">
               {activeFilter === 'hidden'
                 ? 'You have not hidden any internships yet.'
-                : 'Check back later or ask your admin to post new listings.'}
+                : activeFilter === 'gmail'
+                  ? 'Try refreshing or make sure you logged in with Google to enable Gmail sync.'
+                  : 'Check back later or ask your admin to post new listings.'}
             </p>
           </div>
         ) : (
@@ -207,9 +281,16 @@ export default function BrowseInternships() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="glass-card p-6 flex flex-col cursor-pointer border hover:border-accent-blue/50 transition-all duration-200 hover:shadow-[0_0_20px_rgba(59,130,246,0.1)] group relative"
+              className={`glass-card p-6 flex flex-col cursor-pointer border hover:border-accent-blue/50 transition-all duration-200 group relative ${
+                job.is_gmail ? 'hover:shadow-[0_0_20px_rgba(59,130,246,0.15)]' : 'hover:shadow-[0_0_20px_rgba(59,130,246,0.1)]'
+              }`}
               onClick={() => setSelectedJob(job)}
             >
+              {/* Gmail badge strip */}
+              {job.is_gmail && (
+                <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500/0 via-blue-500/60 to-blue-500/0 rounded-t-xl" />
+              )}
+
               <div className="flex justify-between items-start mb-4">
                 <div className="w-12 h-12 bg-white/10 rounded-lg p-1.5 shrink-0 flex items-center justify-center overflow-hidden">
                   <img
@@ -220,7 +301,13 @@ export default function BrowseInternships() {
                   />
                 </div>
                 <div className="flex gap-2 items-center">
-                  {/* Hide button — always visible, subtle */}
+                  {/* Gmail source badge */}
+                  {job.is_gmail && (
+                    <Badge className="bg-blue-500/10 text-blue-400 border border-blue-500/20 text-xs flex items-center gap-1">
+                      <Mail className="w-3 h-3" /> Gmail
+                    </Badge>
+                  )}
+                  {/* Hide button */}
                   {activeFilter !== 'hidden' && (
                     <button
                       onClick={(e) => hideJob(e, job.id)}
@@ -233,13 +320,13 @@ export default function BrowseInternships() {
                   {appliedJobs.has(job.id) && (
                     <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">Applied ✓</Badge>
                   )}
-                  {job.is_featured && !appliedJobs.has(job.id) && (
+                  {job.is_featured && !appliedJobs.has(job.id) && !job.is_gmail && (
                     <Badge className="bg-accent-gold/20 text-accent-gold border-accent-gold/30">Featured</Badge>
                   )}
                   {/* Restore button — only on hidden tab */}
                   {activeFilter === 'hidden' && (
                     <button
-                      onClick={(e) => { e.stopPropagation(); const updated = new Set(hiddenJobs); updated.delete(job.id); setHiddenJobs(updated); localStorage.setItem(HIDDEN_KEY, JSON.stringify([...updated])); toast.success('Internship restored!') }}
+                      onClick={(e) => restoreJob(e, job.id)}
                       title="Restore this internship"
                       className="p-1.5 rounded-lg bg-white/5 hover:bg-emerald-500/20 text-text-secondary hover:text-emerald-400 transition-colors"
                     >
@@ -257,11 +344,13 @@ export default function BrowseInternships() {
               )}
 
               <div className="flex flex-wrap gap-3 text-xs text-text-secondary mb-4">
-                <span className="flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-accent-blue/70" />
-                  {job.location}
-                  {job.work_mode && job.work_mode !== 'See Email' && ` (${job.work_mode})`}
-                </span>
+                {job.location && (
+                  <span className="flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-accent-blue/70" />
+                    {job.location}
+                    {job.work_mode && job.work_mode !== 'See Email' && ` (${job.work_mode})`}
+                  </span>
+                )}
                 {job.stipend && job.stipend !== 'See Email' && (
                   <span className="flex items-center gap-1.5">
                     <DollarSign className="w-3.5 h-3.5 text-accent-teal/70" />
@@ -278,7 +367,7 @@ export default function BrowseInternships() {
 
               <div className="mt-auto border-t border-white/10 pt-4 flex items-center justify-between">
                 <p className="text-xs text-text-secondary">
-                  {job.is_gmail ? `Received: ${job.deadline}` : `Deadline: ${job.deadline}`}
+                  {job.is_gmail ? `Received: ${job.deadline}` : `Deadline: ${job.deadline || '—'}`}
                 </p>
                 <span className="text-sm font-medium text-accent-blue flex items-center gap-1 group-hover:gap-2 transition-all">
                   {job.is_gmail ? 'Open Email' : 'View Details'}
@@ -311,7 +400,7 @@ export default function BrowseInternships() {
               <div className="sticky top-0 bg-secondary/80 backdrop-blur-md border-b border-white/10 p-4 flex items-center justify-between z-10">
                 <h3 className="font-heading font-bold text-lg flex items-center gap-2">
                   {selectedJob.is_gmail && <Mail className="w-5 h-5 text-blue-400" />}
-                  {selectedJob.is_gmail ? 'Email Internship' : 'Internship Details'}
+                  {selectedJob.is_gmail ? 'Gmail Internship' : 'Internship Details'}
                 </h3>
                 <button
                   onClick={() => setSelectedJob(null)}
@@ -397,9 +486,9 @@ export default function BrowseInternships() {
                     <>
                       <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl mb-4 text-sm text-blue-300">
                         <p className="font-semibold mb-1 flex items-center gap-2">
-                          <Mail className="w-4 h-4" /> This internship was found in your Gmail
+                          <Mail className="w-4 h-4" /> This internship was found in your Gmail inbox
                         </p>
-                        <p>The email has details like contact info, skills required, and how to apply. Open the original email to read everything and apply directly.</p>
+                        <p>Open the original email to see full details — contact info, application process, and requirements are in there.</p>
                       </div>
                       <div className="flex gap-4">
                         <Button
