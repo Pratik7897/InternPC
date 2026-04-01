@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, MapPin, DollarSign, Briefcase, X, ChevronRight, RefreshCw, EyeOff, Eye } from 'lucide-react'
+import { Search, MapPin, DollarSign, Briefcase, X, ChevronRight, RefreshCw, EyeOff, Eye, Mail, ExternalLink } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
 import { Input } from '../../components/ui/Input'
@@ -33,27 +33,31 @@ export default function BrowseInternships() {
   const fetchInternships = async () => {
     setIsLoading(true)
     try {
-      // Fetch active internships (neq false so null rows also show)
+      // Fetch all internships (including those where is_active is null — newly posted ones)
       const { data: jobsData, error: jobsError } = await supabase
         .from('internships')
         .select('*')
-        .neq('is_active', false)
         .order('created_at', { ascending: false })
 
       console.log('[Internships] fetched:', jobsData?.length ?? 0, jobsError)
-      if (jobsError) throw jobsError
+      if (jobsError) {
+        console.error('[Internships] Supabase error:', jobsError)
+        throw jobsError
+      }
 
       // Fetch student's existing applications
-      const { data: appliedData } = await supabase
+      const { data: appliedData, error: appliedError } = await supabase
         .from('applications')
         .select('internship_id')
         .eq('student_id', user.id)
 
+      if (appliedError) console.warn('[Applications] fetch error:', appliedError)
+
       setAppliedJobs(new Set((appliedData || []).map(app => app.internship_id)))
       setInternships(jobsData || [])
     } catch (error) {
-      toast.error('Failed to load internships.')
-      console.error(error)
+      toast.error('Failed to load internships. Check your connection.')
+      console.error('[BrowseInternships] Error:', error)
     } finally {
       setIsLoading(false)
     }

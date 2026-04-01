@@ -64,7 +64,7 @@ export default function AdminDashboard() {
       const [profilesReq, appsReq, internshipsReq] = await Promise.all([
         supabase.from('profiles').select('branch, profile_completion, created_at'),
         supabase.from('applications').select('status, internships(title)'),
-        supabase.from('internships').select('id').eq('status', 'active')
+        supabase.from('internships').select('id').neq('is_active', false)
       ])
 
       const profiles = profilesReq.data || []

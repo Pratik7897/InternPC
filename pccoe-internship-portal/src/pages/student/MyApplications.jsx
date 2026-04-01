@@ -47,8 +47,8 @@ export default function MyApplications() {
   }
 
   const filteredApps = applications.filter(app => 
-    app.internships?.company_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    app.internships?.title.toLowerCase().includes(searchTerm.toLowerCase())
+    app.internships?.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    app.internships?.title?.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   return (
@@ -93,8 +93,13 @@ export default function MyApplications() {
               className="p-4 md:grid md:grid-cols-12 md:gap-4 md:items-center hover:bg-white/[0.02] transition-colors"
             >
               <div className="col-span-5 flex items-center gap-4 mb-4 md:mb-0">
-                <div className="w-12 h-12 bg-white rounded-lg p-1.5 shrink-0 border border-white/10">
-                  <img src={app.internships?.company_logo_url || 'https://via.placeholder.com/150'} alt={app.internships?.company_name} className="w-full h-full object-contain" />
+                <div className="w-12 h-12 bg-white/10 rounded-lg p-1.5 shrink-0 border border-white/10 flex items-center justify-center overflow-hidden">
+                  <img 
+                    src={app.internships?.company_logo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent((app.internships?.company_name || 'C').charAt(0))}&background=1e3a5f&color=60a5fa&bold=true`} 
+                    alt={app.internships?.company_name} 
+                    className="w-full h-full object-contain"
+                    onError={e => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent((app.internships?.company_name || 'C').charAt(0))}&background=1e3a5f&color=60a5fa&bold=true` }}
+                  />
                 </div>
                 <div>
                   <h3 className="font-heading font-bold text-text-primary">{app.internships?.title}</h3>

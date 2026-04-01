@@ -68,13 +68,14 @@ export default function InternshipsManagement() {
         title: formData.title,
         company_name: formData.company_name,
         description: formData.description,
-        requirements: formData.requirements.split(',').map(s => s.trim()),
+        requirements: formData.requirements.split(',').map(s => s.trim()).filter(Boolean),
         stipend: formData.stipend,
         location: formData.location,
         work_mode: 'Hybrid', // defaulting for simplicity
         duration: '6 Months', // defaulting for simplicity
         deadline: formData.deadline,
         is_featured: formData.is_featured,
+        is_active: true,
         posted_by: user.id
       }).select()
 

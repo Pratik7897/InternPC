@@ -23,6 +23,7 @@ export default function StudentDashboard() {
   const { user } = useAuthStore()
   const [profile, setProfile] = useState(null)
   const [stats, setStats] = useState({ applied: 0, shortlisted: 0, newInternships: 0 })
+  const [featuredRoles, setFeaturedRoles] = useState([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -52,9 +53,22 @@ export default function StudentDashboard() {
         .eq('student_id', user.id)
         .in('status', ['shortlisted', 'under_review', 'selected'])
 
-      // Fetch Active Internships Count
-      const { data: activeData } = await supabase.from('internships').select('id').eq('is_active', true)
+      // Fetch Active Internships Count (includes null is_active since those are newly posted)
+      const { data: activeData } = await supabase
+        .from('internships')
+        .select('id')
+        .neq('is_active', false)
 
+      // Fetch featured roles for the dashboard widget
+      const { data: featuredData } = await supabase
+        .from('internships')
+        .select('id, title, company_name, location, work_mode')
+        .eq('is_featured', true)
+        .neq('is_active', false)
+        .order('created_at', { ascending: false })
+        .limit(3)
+
+      setFeaturedRoles(featuredData || [])
       setStats({
         applied: appliedData?.length || 0,
         shortlisted: shortData?.length || 0,
@@ -179,16 +193,28 @@ export default function StudentDashboard() {
                 <span>Featured Roles</span>
                 <Link to="/student/internships" className="text-xs text-accent-blue font-medium hover:underline flex items-center">View All <ArrowRight className="w-3 h-3 ml-1" /></Link>
               </h2>
-              <div className="space-y-4 flex-1">
-                {[1,2,3].map(i => (
-                  <div key={i} className="group p-3 border border-white/5 bg-white/5 rounded-xl hover:border-white/20 transition-all flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium text-sm">Software Engineer Intern</h4>
-                      <p className="text-xs text-text-secondary mt-0.5">Google • Remote</p>
-                    </div>
-                    <Badge variant="outline" className="opacity-0 group-hover:opacity-100 transition-opacity text-xs bg-accent-blue/10 text-accent-blue border-accent-blue/20">Apply</Badge>
+              <div className="space-y-3 flex-1">
+                {featuredRoles.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full py-6 text-center">
+                    <Briefcase className="w-8 h-8 text-text-secondary/30 mb-2" />
+                    <p className="text-text-secondary text-sm">No featured internships yet.</p>
+                    <Link to="/student/internships" className="text-xs text-accent-blue mt-1 hover:underline">Browse all listings</Link>
                   </div>
-                ))}
+                ) : (
+                  featuredRoles.map(role => (
+                    <Link
+                      key={role.id}
+                      to="/student/internships"
+                      className="group p-3 border border-white/5 bg-white/5 rounded-xl hover:border-accent-blue/30 hover:bg-white/10 transition-all flex items-center justify-between"
+                    >
+                      <div>
+                        <h4 className="font-medium text-sm text-text-primary">{role.title}</h4>
+                        <p className="text-xs text-text-secondary mt-0.5">{role.company_name}{role.location ? ` • ${role.location}` : ''}</p>
+                      </div>
+                      <Badge variant="outline" className="opacity-0 group-hover:opacity-100 transition-opacity text-xs bg-accent-gold/10 text-accent-gold border-accent-gold/30">⭐ Featured</Badge>
+                    </Link>
+                  ))
+                )}
               </div>
             </motion.div>
 
