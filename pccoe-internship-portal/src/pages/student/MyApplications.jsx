@@ -22,8 +22,9 @@ export default function MyApplications() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    fetchApplications()
-  }, [])
+    if (user?.id) fetchApplications()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id])
 
   const fetchApplications = async () => {
     setIsLoading(true)

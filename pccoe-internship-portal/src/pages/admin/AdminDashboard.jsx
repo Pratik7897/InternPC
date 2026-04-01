@@ -34,11 +34,6 @@ const branchData = [
   { name: 'CIVIL', value: 500 },
 ]
 
-const registrationDataFallback = [
-  { date: 'Oct 1', count: 45 }, { date: 'Oct 5', count: 120 },
-  { date: 'Oct 10', count: 80 }, { date: 'Oct 15', count: 210 },
-  { date: 'Oct 20', count: 150 }, { date: 'Oct 25', count: 300 }
-]
 
 const COLORS = ['#3B82F6', '#14B8A6', '#F59E0B', '#8B5CF6', '#EC4899', '#EF4444', '#10B981']
 
@@ -52,6 +47,7 @@ export default function AdminDashboard() {
   })
   const [branchData, setBranchData] = useState([])
   const [appData, setAppData] = useState([])
+  const [registrationData, setRegistrationData] = useState([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -106,6 +102,22 @@ export default function AdminDashboard() {
         .sort((a, b) => b.applications - a.applications)
         .slice(0, 5)
       setAppData(appsArray)
+
+      // Build registration chart: profiles created in last 30 days grouped by date
+      const now = Date.now()
+      const regByDate = {}
+      profiles.forEach(p => {
+        if (!p.created_at) return
+        const d = new Date(p.created_at)
+        const daysAgo = Math.floor((now - d.getTime()) / 86400000)
+        if (daysAgo > 30) return
+        const label = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+        regByDate[label] = (regByDate[label] || 0) + 1
+      })
+      const regArr = Object.entries(regByDate)
+        .map(([date, count]) => ({ date, count }))
+        .sort((a, b) => new Date(a.date) - new Date(b.date))
+      setRegistrationData(regArr.length ? regArr : [{ date: 'No data', count: 0 }])
 
     } catch (err) {
       console.error(err)
@@ -207,7 +219,7 @@ export default function AdminDashboard() {
           <h2 className="text-lg font-heading font-bold mb-6">Registrations (Last 30 Days)</h2>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={registrationDataFallback} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+              <LineChart data={registrationData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.1)" />
                 <XAxis dataKey="date" stroke="#94A3B8" fontSize={12} tickLine={false} axisLine={false} />
                 <YAxis stroke="#94A3B8" fontSize={12} tickLine={false} axisLine={false} />

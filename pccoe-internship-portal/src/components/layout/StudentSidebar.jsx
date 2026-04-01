@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { LayoutDashboard, User, UploadCloud, Briefcase, FileText, Bell, LogOut } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import { cn } from '../../lib/utils'
 import { useAuthStore } from '../../store/authStore'
 import { supabase } from '../../lib/supabase'
@@ -15,11 +15,12 @@ const navItems = [
 ]
 
 export default function StudentSidebar() {
-  const { signOut, user } = useAuthStore()
-  const [completionPercentage, setCompletionPercentage] = useState(0)
+  const { signOut, user, profileCompletion, setProfileCompletion } = useAuthStore()
 
+  // Fetch on mount + realtime subscription so value stays in sync across tabs/devices
   useEffect(() => {
     if (!user) return
+
     const fetchCompletion = async () => {
       const { data } = await supabase
         .from('profiles')
@@ -27,11 +28,27 @@ export default function StudentSidebar() {
         .eq('id', user.id)
         .maybeSingle()
       if (data?.profile_completion != null) {
-        setCompletionPercentage(data.profile_completion)
+        setProfileCompletion(data.profile_completion)
       }
     }
     fetchCompletion()
-  }, [user])
+
+    // Realtime: update whenever the profiles row changes
+    const channel = supabase
+      .channel(`profile-completion-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },
+        (payload) => {
+          if (payload.new?.profile_completion != null) {
+            setProfileCompletion(payload.new.profile_completion)
+          }
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [user, setProfileCompletion])
 
   return (
     <div className="w-64 border-r border-white/10 bg-tertiary hidden md:flex flex-col h-full">

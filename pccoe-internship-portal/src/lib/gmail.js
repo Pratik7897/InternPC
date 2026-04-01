@@ -1,27 +1,34 @@
 // Keywords that identify internship-related emails
 const INTERNSHIP_KEYWORDS = [
   'internship',
+  'internships',
   'intern',
   'off campus',
   'off-campus',
   'hiring',
+  'we are hiring',
   'recruitment',
   'campus recruitment',
   'job opening',
+  'job opportunity',
   'placement drive',
   'career opportunity',
-  'we are hiring',
   'apply now',
   'fresher',
   'graduate program',
   'trainee',
   'apprentice',
+  'summer intern',
+  'winter intern',
+  'opportunity',
+  'vacancies',
+  'opening',
 ]
 
 // Build Gmail query string - searches subject AND body for keywords
 const buildGmailQuery = () => {
   // Gmail search: match any of these keywords anywhere in the email, last 90 days
-  const keywordQuery = '(internship OR intern OR "off campus" OR "off-campus" OR hiring OR recruitment OR "campus placement" OR "job opening" OR fresher OR trainee)'
+  const keywordQuery = '(internship OR internships OR intern OR "off campus" OR "off-campus" OR hiring OR "we are hiring" OR recruitment OR "campus placement" OR "job opening" OR "job opportunity" OR fresher OR trainee OR "placement drive" OR vacancies OR opening)'
   return `${keywordQuery} newer_than:90d -category:promotions -category:social`
 }
 
@@ -108,8 +115,12 @@ export const fetchGmailInternships = async (providerToken) => {
           const dateRaw = headers.find(h => h.name === 'Date')?.value || ''
           const snippet = msgData.snippet || ''
 
-          // Client-side keyword filter on subject OR snippet
-          if (!hasInternshipKeyword(subject) && !hasInternshipKeyword(snippet)) {
+          // Client-side keyword filter on subject OR snippet — lenient check
+          // (If Gmail API matched based on body, subject might not have the keyword,
+          //  so we accept anything where the API returned a result unless it's an
+          //  obvious non-match like a spam/promo that slipped through)
+          const combinedText = subject + ' ' + snippet
+          if (!hasInternshipKeyword(combinedText)) {
             return null
           }
 

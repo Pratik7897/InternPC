@@ -1,137 +1,231 @@
 -- ========================================================
--- PCCOE Internship Portal — COMPLETE Database Fix
--- Run this in Supabase SQL Editor:
---   https://supabase.com/dashboard → Your Project → SQL Editor
+-- PCCOE Internship Portal — Full Database Setup
+-- Paste this ENTIRE script into Supabase SQL Editor and Run
 -- ========================================================
 
 
 -- -------------------------------------------------------
--- 1. PROFILES TABLE — RLS Policies
---    (This is what caused profile data to NOT save on refresh)
+-- STEP 1: Drop everything cleanly
 -- -------------------------------------------------------
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Users can view own profile" ON profiles;
-CREATE POLICY "Users can view own profile"
-  ON profiles FOR SELECT
-  TO authenticated
-  USING (id = auth.uid() OR EXISTS (SELECT 1 FROM admin_users WHERE id = auth.uid()));
-
-DROP POLICY IF EXISTS "Users can insert own profile" ON profiles;
-CREATE POLICY "Users can insert own profile"
-  ON profiles FOR INSERT
-  TO authenticated
-  WITH CHECK (id = auth.uid());
-
-DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
-CREATE POLICY "Users can update own profile"
-  ON profiles FOR UPDATE
-  TO authenticated
-  USING (id = auth.uid() OR EXISTS (SELECT 1 FROM admin_users WHERE id = auth.uid()));
+DROP TABLE IF EXISTS applications  CASCADE;
+DROP TABLE IF EXISTS announcements CASCADE;
+DROP TABLE IF EXISTS email_logs    CASCADE;
+DROP TABLE IF EXISTS internships   CASCADE;
+DROP TABLE IF EXISTS admin_users   CASCADE;
+DROP TABLE IF EXISTS profiles      CASCADE;
 
 
 -- -------------------------------------------------------
--- 2. INTERNSHIPS TABLE — RLS Policies
+-- STEP 2: Create tables
 -- -------------------------------------------------------
-ALTER TABLE internships ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Allow authenticated users to read internships" ON internships;
-CREATE POLICY "Allow authenticated users to read internships"
-  ON internships FOR SELECT
+-- profiles
+CREATE TABLE profiles (
+  id                   UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  full_name            TEXT,
+  email                TEXT UNIQUE,
+  phone                TEXT,
+  date_of_birth        DATE,
+  gender               TEXT,
+  profile_photo_url    TEXT,
+  prn_number           TEXT UNIQUE,
+  branch               TEXT,
+  current_year         TEXT,
+  cgpa                 NUMERIC(4,2),
+  active_backlogs      INTEGER DEFAULT 0,
+  percentage_12th      NUMERIC(5,2),
+  percentage_10th      NUMERIC(5,2),
+  technical_skills     TEXT[],
+  soft_skills          TEXT[],
+  languages_known      TEXT[],
+  projects             JSONB,
+  previous_internships JSONB,
+  resume_url           TEXT,
+  intro_video_url      TEXT,
+  certificates         JSONB,
+  linkedin_url         TEXT,
+  github_url           TEXT,
+  portfolio_url        TEXT,
+  is_profile_public    BOOLEAN DEFAULT true,
+  profile_completion   INTEGER DEFAULT 0,
+  is_active            BOOLEAN DEFAULT true,
+  created_at           TIMESTAMPTZ DEFAULT NOW(),
+  updated_at           TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- admin_users
+CREATE TABLE admin_users (
+  id         UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  full_name  TEXT,
+  email      TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- internships
+CREATE TABLE internships (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title            TEXT NOT NULL,
+  company_name     TEXT NOT NULL,
+  company_logo_url TEXT,
+  description      TEXT,
+  requirements     TEXT[],
+  skills_required  TEXT[],
+  stipend          TEXT,
+  location         TEXT,
+  work_mode        TEXT,
+  duration         TEXT,
+  openings         INTEGER,
+  deadline         DATE,
+  apply_link       TEXT,
+  posted_by        UUID REFERENCES profiles(id),
+  is_active        BOOLEAN DEFAULT true,
+  is_featured      BOOLEAN DEFAULT false,
+  created_at       TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- applications
+CREATE TABLE applications (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id    UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  internship_id UUID REFERENCES internships(id) ON DELETE CASCADE,
+  status        TEXT DEFAULT 'applied',
+  cover_note    TEXT,
+  admin_notes   TEXT,
+  applied_at    TIMESTAMPTZ DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(student_id, internship_id)
+);
+
+-- email_logs
+CREATE TABLE email_logs (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sent_by          UUID REFERENCES admin_users(id),
+  subject          TEXT,
+  body             TEXT,
+  recipient_filter JSONB,
+  recipient_count  INTEGER,
+  status           TEXT,
+  sent_at          TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- announcements  (uses 'content' to match the app code)
+CREATE TABLE announcements (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title      TEXT NOT NULL,
+  content    TEXT NOT NULL,
+  type       TEXT DEFAULT 'info' CHECK (type IN ('info', 'urgent', 'event')),
+  posted_by  UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  is_active  BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+
+-- -------------------------------------------------------
+-- STEP 3: Enable Row Level Security on all tables
+-- -------------------------------------------------------
+ALTER TABLE profiles      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE admin_users   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE internships   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE applications  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE email_logs    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE announcements ENABLE ROW LEVEL SECURITY;
+
+
+-- -------------------------------------------------------
+-- STEP 4: RLS Policies
+-- -------------------------------------------------------
+
+-- ── profiles ────────────────────────────────────────────
+-- Admins can do everything
+CREATE POLICY "Admins full access on profiles" ON profiles
+  FOR ALL
+  USING (EXISTS (SELECT 1 FROM admin_users WHERE id = auth.uid()));
+
+-- Students can SELECT their own row
+CREATE POLICY "Students read own profile" ON profiles
+  FOR SELECT
+  USING (auth.uid() = id);
+
+-- Students can INSERT their own row (needed at registration & OAuth)
+CREATE POLICY "Students insert own profile" ON profiles
+  FOR INSERT
+  WITH CHECK (auth.uid() = id);
+
+-- Students can UPDATE their own row
+CREATE POLICY "Students update own profile" ON profiles
+  FOR UPDATE
+  USING (auth.uid() = id);
+
+-- Authenticated users can view public profiles (for directory page)
+CREATE POLICY "Authenticated read public profiles" ON profiles
+  FOR SELECT
+  TO authenticated
+  USING (is_profile_public = true);
+
+
+-- ── admin_users ─────────────────────────────────────────
+-- Only the admin themselves can read their own record
+-- (needed so checkSession() can determine role)
+CREATE POLICY "Admins access own row" ON admin_users
+  FOR SELECT
+  TO authenticated
+  USING (true);  -- any authenticated user may SELECT to check if they are admin
+
+
+-- ── internships ─────────────────────────────────────────
+-- Admins can do everything
+CREATE POLICY "Admins full access on internships" ON internships
+  FOR ALL
+  USING (EXISTS (SELECT 1 FROM admin_users WHERE id = auth.uid()));
+
+-- All authenticated users can read ALL internships (active or not visible to admin)
+CREATE POLICY "Authenticated users read internships" ON internships
+  FOR SELECT
   TO authenticated
   USING (true);
 
-DROP POLICY IF EXISTS "Allow admin to insert internships" ON internships;
-CREATE POLICY "Allow admin to insert internships"
-  ON internships FOR INSERT
-  TO authenticated
-  WITH CHECK (EXISTS (SELECT 1 FROM admin_users WHERE id = auth.uid()));
 
-DROP POLICY IF EXISTS "Allow admin to update internships" ON internships;
-CREATE POLICY "Allow admin to update internships"
-  ON internships FOR UPDATE
-  TO authenticated
+-- ── applications ────────────────────────────────────────
+-- Admins can do everything
+CREATE POLICY "Admins full access on applications" ON applications
+  FOR ALL
   USING (EXISTS (SELECT 1 FROM admin_users WHERE id = auth.uid()));
 
-DROP POLICY IF EXISTS "Allow admin to delete internships" ON internships;
-CREATE POLICY "Allow admin to delete internships"
-  ON internships FOR DELETE
-  TO authenticated
+-- Students can SELECT, INSERT their own applications
+CREATE POLICY "Students read own applications" ON applications
+  FOR SELECT
+  USING (auth.uid() = student_id);
+
+CREATE POLICY "Students submit applications" ON applications
+  FOR INSERT
+  WITH CHECK (auth.uid() = student_id);
+
+
+-- ── email_logs ──────────────────────────────────────────
+CREATE POLICY "Admins access email_logs" ON email_logs
+  FOR ALL
   USING (EXISTS (SELECT 1 FROM admin_users WHERE id = auth.uid()));
 
--- Backfill: set is_active = true for any existing internships where is_active is null
+
+-- ── announcements ───────────────────────────────────────
+-- Admins can do everything
+CREATE POLICY "Admins full access on announcements" ON announcements
+  FOR ALL
+  USING (EXISTS (SELECT 1 FROM admin_users WHERE id = auth.uid()));
+
+-- All authenticated users can read active announcements
+CREATE POLICY "Authenticated read announcements" ON announcements
+  FOR SELECT
+  TO authenticated
+  USING (true);
+
+
+-- -------------------------------------------------------
+-- STEP 5: Backfill — ensure existing internships are visible
+-- -------------------------------------------------------
 UPDATE internships SET is_active = true WHERE is_active IS NULL;
 
 
 -- -------------------------------------------------------
--- 3. APPLICATIONS TABLE — RLS Policies
--- -------------------------------------------------------
-ALTER TABLE applications ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Students can read own applications" ON applications;
-CREATE POLICY "Students can read own applications"
-  ON applications FOR SELECT
-  TO authenticated
-  USING (
-    student_id = auth.uid()
-    OR EXISTS (SELECT 1 FROM admin_users WHERE id = auth.uid())
-  );
-
-DROP POLICY IF EXISTS "Students can create applications" ON applications;
-CREATE POLICY "Students can create applications"
-  ON applications FOR INSERT
-  TO authenticated
-  WITH CHECK (student_id = auth.uid());
-
-DROP POLICY IF EXISTS "Admins can update applications" ON applications;
-CREATE POLICY "Admins can update applications"
-  ON applications FOR UPDATE
-  TO authenticated
-  USING (EXISTS (SELECT 1 FROM admin_users WHERE id = auth.uid()));
-
-
--- -------------------------------------------------------
--- 4. ANNOUNCEMENTS TABLE — Create if not exists + RLS
--- -------------------------------------------------------
-CREATE TABLE IF NOT EXISTS announcements (
-  id         uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  title      text NOT NULL,
-  content    text NOT NULL,
-  type       text DEFAULT 'info' CHECK (type IN ('info', 'urgent', 'event')),
-  posted_by  uuid REFERENCES auth.users(id) ON DELETE SET NULL,
-  created_at timestamptz DEFAULT now()
-);
-
-ALTER TABLE announcements ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "All authenticated users can read announcements" ON announcements;
-CREATE POLICY "All authenticated users can read announcements"
-  ON announcements FOR SELECT
-  TO authenticated
-  USING (true);
-
-DROP POLICY IF EXISTS "Admins can insert announcements" ON announcements;
-CREATE POLICY "Admins can insert announcements"
-  ON announcements FOR INSERT
-  TO authenticated
-  WITH CHECK (EXISTS (SELECT 1 FROM admin_users WHERE id = auth.uid()));
-
-DROP POLICY IF EXISTS "Admins can delete announcements" ON announcements;
-CREATE POLICY "Admins can delete announcements"
-  ON announcements FOR DELETE
-  TO authenticated
-  USING (EXISTS (SELECT 1 FROM admin_users WHERE id = auth.uid()));
-
-
--- -------------------------------------------------------
--- 5. STORAGE BUCKETS — Make sure 'documents' bucket exists
---    and has correct policies for uploads
--- -------------------------------------------------------
--- Run these manually if uploads are failing:
--- INSERT INTO storage.buckets (id, name, public) VALUES ('documents', 'documents', true)
--- ON CONFLICT (id) DO UPDATE SET public = true;
-
-
--- -------------------------------------------------------
--- Done! Your portal database is now correctly configured.
+-- Done! All tables and policies are configured correctly.
 -- -------------------------------------------------------

@@ -26,6 +26,8 @@ export const useAuthStore = create((set, get) => ({
   role: null, // 'student' | 'admin'
   providerToken: loadProviderToken(), // Restore from localStorage immediately
   isLoading: true, // Start true while we check initial session
+  profileCompletion: 0, // 0-100, updated after profile save
+  setProfileCompletion: (pct) => set({ profileCompletion: pct }),
 
   // Method to check active session on refresh
   checkSession: async () => {
