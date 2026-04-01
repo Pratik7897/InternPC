@@ -91,7 +91,7 @@ export default function StudentSidebar() {
               <path
                 className="text-accent-blue transition-all duration-700"
                 strokeWidth="3"
-                strokeDasharray={`${completionPercentage}, 100`}
+                strokeDasharray={`${profileCompletion}, 100`}
                 strokeLinecap="round"
                 stroke="currentColor"
                 fill="none"
@@ -99,7 +99,7 @@ export default function StudentSidebar() {
               />
             </svg>
             <div className="absolute inset-0 flex items-center justify-center text-xs font-bold">
-              {completionPercentage}%
+              {profileCompletion}%
             </div>
           </div>
           <p className="text-xs text-text-secondary">Profile Completion</p>

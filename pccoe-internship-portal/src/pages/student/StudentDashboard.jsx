@@ -7,13 +7,6 @@ import { Badge } from '../../components/ui/Badge'
 import { useAuthStore } from '../../store/authStore'
 import { supabase } from '../../lib/supabase'
 
-const profileSteps = [
-  { id: 1, label: 'Basic Information', completed: true, link: '/student/profile?step=1' },
-  { id: 2, label: 'Academic Details', completed: true, link: '/student/profile?step=2' },
-  { id: 3, label: 'Skills & Experience', completed: false, link: '/student/profile?step=3' },
-  { id: 4, label: 'Upload Documents', completed: false, link: '/student/upload' }
-]
-
 
 
 export default function StudentDashboard() {

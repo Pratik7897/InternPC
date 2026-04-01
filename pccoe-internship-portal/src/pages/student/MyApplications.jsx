@@ -10,8 +10,9 @@ import toast from 'react-hot-toast'
 const statusConfig = {
   applied: { color: 'bg-blue-500/20 text-blue-400 border-blue-500/30', label: 'Applied' },
   shortlisted: { color: 'bg-accent-gold/20 text-accent-gold border-accent-gold/30', label: 'Shortlisted' },
+  under_review: { color: 'bg-purple-500/20 text-purple-400 border-purple-500/30', label: 'Under Review' },
   interview: { color: 'bg-accent-teal/20 text-accent-teal border-accent-teal/30', label: 'Interview Scheduled' },
-  selected: { color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30', label: 'Selected' },
+  selected: { color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30', label: 'Selected 🎉' },
   rejected: { color: 'bg-red-500/10 text-red-400 border-red-500/20', label: 'Not Selected' },
 }
 

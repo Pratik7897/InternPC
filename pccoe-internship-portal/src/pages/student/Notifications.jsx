@@ -28,9 +28,9 @@ export default function Notifications() {
       // Fetch application status updates for the student
       const { data: applicationsData } = await supabase
         .from('applications')
-        .select('id, status, created_at, internships(title, company_name)')
+        .select('id, status, applied_at, internships(title, company_name)')
         .eq('student_id', user.id)
-        .order('updated_at', { ascending: false })
+        .order('applied_at', { ascending: false })
         .limit(10)
 
       setAnnouncements(announcementsData || [])
@@ -119,7 +119,7 @@ export default function Notifications() {
                       {app.internships?.title || 'Internship'}
                       {app.internships?.company_name && ` at ${app.internships.company_name}`}
                     </h3>
-                    <span className="text-xs text-text-secondary shrink-0">{formatDate(app.created_at)}</span>
+                    <span className="text-xs text-text-secondary shrink-0">{formatDate(app.applied_at)}</span>
                   </div>
                   <p className={`text-sm font-medium ${getStatusColor(app.status)}`}>
                     Status: {getStatusLabel(app.status)}

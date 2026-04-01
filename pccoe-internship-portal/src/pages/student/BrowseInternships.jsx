@@ -33,6 +33,7 @@ export default function BrowseInternships() {
       const { data: jobsData, error: jobsError } = await supabase
         .from('internships')
         .select('*')
+        .neq('is_active', false)
         .order('created_at', { ascending: false })
 
       if (jobsError) {

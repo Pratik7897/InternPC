@@ -9,32 +9,6 @@ import { Button } from '../../components/ui/Button'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 
-// Fallback Mock Data for charts if empty
-const kpiData = [
-  { title: 'Total Students', value: '4,521', icon: Users, color: 'text-blue-400' },
-  { title: 'Profiles Complete', value: '82%', icon: FileCheck, color: 'text-emerald-400' },
-  { title: 'Active Internships', value: '124', icon: Briefcase, color: 'text-accent-gold' },
-  { title: 'Total Applications', value: '8,932', icon: FileCheck, color: 'text-purple-400' },
-  { title: 'Students Placed', value: '3,105', icon: Award, color: 'text-accent-teal' }
-]
-
-const applicationsData = [
-  { name: 'Google SWE', applications: 450 },
-  { name: 'Amazon SDE', applications: 380 },
-  { name: 'Microsoft UI', applications: 310 },
-  { name: 'Meta Data', applications: 290 },
-  { name: 'Apple iOS', applications: 210 },
-]
-
-const branchData = [
-  { name: 'CSE', value: 1200 },
-  { name: 'IT', value: 800 },
-  { name: 'ENTC', value: 900 },
-  { name: 'MECH', value: 600 },
-  { name: 'CIVIL', value: 500 },
-]
-
-
 const COLORS = ['#3B82F6', '#14B8A6', '#F59E0B', '#8B5CF6', '#EC4899', '#EF4444', '#10B981']
 
 export default function AdminDashboard() {

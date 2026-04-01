@@ -12,6 +12,7 @@ import { useAuthStore } from '../../store/authStore'
 export default function InternshipsManagement() {
   const { user } = useAuthStore()
   const [internships, setInternships] = useState([])
+  const [search, setSearch] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [deleteTarget, setDeleteTarget] = useState(null) // { id, title } of internship to delete
@@ -103,7 +104,12 @@ export default function InternshipsManagement() {
         <div className="flex items-center gap-3">
           <div className="relative w-full md:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
-            <Input placeholder="Search roles or companies..." className="pl-9 h-10" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search roles or companies..."
+              className="pl-9 h-10"
+            />
           </div>
           <Button onClick={() => setIsModalOpen(true)} className="gap-2 shrink-0 shadow-[var(--glow)]">
             <Plus className="w-4 h-4"/> Post New
@@ -127,7 +133,11 @@ export default function InternshipsManagement() {
             <tbody className="divide-y divide-white/5">
               {isLoading ? (
                 <tr><td colSpan="6" className="p-4 text-center text-text-secondary">Loading internships...</td></tr>
-              ) : internships.map((job, i) => (
+              ) : internships.filter(j =>
+                  !search ||
+                  j.title?.toLowerCase().includes(search.toLowerCase()) ||
+                  j.company_name?.toLowerCase().includes(search.toLowerCase())
+                ).map((job, i) => (
                 <motion.tr 
                   key={job.id}
                   initial={{ opacity: 0, y: 10 }}

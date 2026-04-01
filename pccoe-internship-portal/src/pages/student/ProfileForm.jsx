@@ -32,7 +32,7 @@ const EMPTY_FORM = {
 }
 
 export default function ProfileForm() {
-  const { user } = useAuthStore()
+  const { user, setProfileCompletion } = useAuthStore()
   const [currentStep, setCurrentStep] = useState(1)
   const [isSaving, setIsSaving] = useState(false)
   const [isFetching, setIsFetching] = useState(true)
@@ -149,6 +149,7 @@ export default function ProfileForm() {
 
       console.log('✅ Profile saved successfully!')
       setSavedOk(true)
+      setProfileCompletion(completion)   // ← update sidebar ring instantly
       toast.success(`Profile saved! ${completion}% complete`, { icon: '✅' })
 
       // Reload fresh from DB to confirm the save worked
