@@ -33,13 +33,14 @@ export default function BrowseInternships() {
   const fetchInternships = async () => {
     setIsLoading(true)
     try {
-      // Fetch active internships from Supabase
+      // Fetch active internships (neq false so null rows also show)
       const { data: jobsData, error: jobsError } = await supabase
         .from('internships')
         .select('*')
-        .eq('is_active', true)
+        .neq('is_active', false)
         .order('created_at', { ascending: false })
 
+      console.log('[Internships] fetched:', jobsData?.length ?? 0, jobsError)
       if (jobsError) throw jobsError
 
       // Fetch student's existing applications
