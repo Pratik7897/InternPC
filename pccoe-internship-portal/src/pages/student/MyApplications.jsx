@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Building, MapPin, Search } from 'lucide-react'
+import { Building, MapPin, Search, TrendingUp, Clock, CheckCircle2, AlertCircle, Briefcase } from 'lucide-react'
 import { Badge } from '../../components/ui/Badge'
 import { Input } from '../../components/ui/Input'
 import { supabase } from '../../lib/supabase'
@@ -8,12 +8,12 @@ import { useAuthStore } from '../../store/authStore'
 import toast from 'react-hot-toast'
 
 const statusConfig = {
-  applied: { color: 'bg-blue-500/20 text-blue-400 border-blue-500/30', label: 'Applied' },
-  shortlisted: { color: 'bg-accent-gold/20 text-accent-gold border-accent-gold/30', label: 'Shortlisted' },
-  under_review: { color: 'bg-purple-500/20 text-purple-400 border-purple-500/30', label: 'Under Review' },
-  interview: { color: 'bg-accent-teal/20 text-accent-teal border-accent-teal/30', label: 'Interview Scheduled' },
-  selected: { color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30', label: 'Selected 🎉' },
-  rejected: { color: 'bg-red-500/10 text-red-400 border-red-500/20', label: 'Not Selected' },
+  applied: { color: 'bg-blue-500/20 text-blue-400 border-blue-500/30', label: 'Applied', icon: Clock },
+  shortlisted: { color: 'bg-accent-gold/20 text-accent-gold border-accent-gold/30', label: 'Shortlisted', icon: AlertCircle },
+  under_review: { color: 'bg-purple-500/20 text-purple-400 border-purple-500/30', label: 'Under Review', icon: Clock },
+  interview: { color: 'bg-accent-teal/20 text-accent-teal border-accent-teal/30', label: 'Interview Scheduled', icon: TrendingUp },
+  selected: { color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30', label: 'Selected', icon: CheckCircle2 },
+  rejected: { color: 'bg-red-500/10 text-red-400 border-red-500/20', label: 'Not Selected', icon: AlertCircle },
 }
 
 export default function MyApplications() {
@@ -21,6 +21,15 @@ export default function MyApplications() {
   const [searchTerm, setSearchTerm] = useState('')
   const [applications, setApplications] = useState([])
   const [isLoading, setIsLoading] = useState(true)
+  const [stats, setStats] = useState({
+    total: 0,
+    pending: 0,
+    shortlisted: 0,
+    interview: 0,
+    selected: 0,
+    rejected: 0,
+    responseRate: 0,
+  })
 
   useEffect(() => {
     if (user?.id) fetchApplications()
@@ -41,6 +50,18 @@ export default function MyApplications() {
 
       if (error) throw error
       setApplications(data || [])
+      
+      const apps = data || []
+      const total = apps.length
+      const pending = apps.filter(a => a.status === 'applied' || a.status === 'under_review').length
+      const shortlisted = apps.filter(a => a.status === 'shortlisted').length
+      const interview = apps.filter(a => a.status === 'interview').length
+      const selected = apps.filter(a => a.status === 'selected').length
+      const rejected = apps.filter(a => a.status === 'rejected').length
+      const responded = shortlisted + interview + selected + rejected
+      const responseRate = total > 0 ? Math.round((responded / total) * 100) : 0
+      
+      setStats({ total, pending, shortlisted, interview, selected, rejected, responseRate })
     } catch (err) {
       toast.error('Failed to load your applications')
     } finally {
@@ -70,6 +91,125 @@ export default function MyApplications() {
           />
         </div>
       </div>
+
+      {/* Application Insights Dashboard */}
+      {!isLoading && stats.total > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="glass-card p-4 rounded-xl"
+          >
+            <div className="flex items-center gap-2 text-text-secondary text-sm mb-1">
+              <Briefcase className="w-4 h-4" /> Total Applied
+            </div>
+            <p className="text-2xl font-heading font-bold text-text-primary">{stats.total}</p>
+          </motion.div>
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+            className="glass-card p-4 rounded-xl"
+          >
+            <div className="flex items-center gap-2 text-text-secondary text-sm mb-1">
+              <Clock className="w-4 h-4" /> Pending
+            </div>
+            <p className="text-2xl font-heading font-bold text-blue-400">{stats.pending}</p>
+          </motion.div>
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="glass-card p-4 rounded-xl"
+          >
+            <div className="flex items-center gap-2 text-text-secondary text-sm mb-1">
+              <AlertCircle className="w-4 h-4" /> Shortlisted
+            </div>
+            <p className="text-2xl font-heading font-bold text-accent-gold">{stats.shortlisted}</p>
+          </motion.div>
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="glass-card p-4 rounded-xl"
+          >
+            <div className="flex items-center gap-2 text-text-secondary text-sm mb-1">
+              <TrendingUp className="w-4 h-4" /> Interviews
+            </div>
+            <p className="text-2xl font-heading font-bold text-accent-teal">{stats.interview}</p>
+          </motion.div>
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="glass-card p-4 rounded-xl"
+          >
+            <div className="flex items-center gap-2 text-text-secondary text-sm mb-1">
+              <CheckCircle2 className="w-4 h-4" /> Selected
+            </div>
+            <p className="text-2xl font-heading font-bold text-emerald-400">{stats.selected}</p>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Response Rate & Status Breakdown Bar */}
+      {!isLoading && stats.total > 0 && (
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+          className="glass-card p-5 rounded-xl"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-medium text-text-secondary">Application Response Rate</h3>
+            <span className="text-lg font-heading font-bold text-text-primary">{stats.responseRate}%</span>
+          </div>
+          <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden flex">
+            {stats.pending > 0 && (
+              <div 
+                className="bg-blue-500/70 h-full transition-all duration-500"
+                style={{ width: `${(stats.pending / stats.total) * 100}%` }}
+                title={`Pending: ${stats.pending}`}
+              />
+            )}
+            {stats.shortlisted > 0 && (
+              <div 
+                className="bg-accent-gold/70 h-full transition-all duration-500"
+                style={{ width: `${(stats.shortlisted / stats.total) * 100}%` }}
+                title={`Shortlisted: ${stats.shortlisted}`}
+              />
+            )}
+            {stats.interview > 0 && (
+              <div 
+                className="bg-accent-teal/70 h-full transition-all duration-500"
+                style={{ width: `${(stats.interview / stats.total) * 100}%` }}
+                title={`Interviews: ${stats.interview}`}
+              />
+            )}
+            {stats.selected > 0 && (
+              <div 
+                className="bg-emerald-500/70 h-full transition-all duration-500"
+                style={{ width: `${(stats.selected / stats.total) * 100}%` }}
+                title={`Selected: ${stats.selected}`}
+              />
+            )}
+            {stats.rejected > 0 && (
+              <div 
+                className="bg-red-500/50 h-full transition-all duration-500"
+                style={{ width: `${(stats.rejected / stats.total) * 100}%` }}
+                title={`Rejected: ${stats.rejected}`}
+              />
+            )}
+          </div>
+          <div className="flex flex-wrap gap-4 mt-3 text-xs text-text-secondary">
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500/70"></span> Pending ({stats.pending})</span>
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-accent-gold/70"></span> Shortlisted ({stats.shortlisted})</span>
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-accent-teal/70"></span> Interviews ({stats.interview})</span>
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500/70"></span> Selected ({stats.selected})</span>
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500/50"></span> Rejected ({stats.rejected})</span>
+          </div>
+        </motion.div>
+      )}
 
       <div className="glass shadow-xl rounded-xl overflow-hidden glass-card">
         {/* Header Row (Desktop) */}

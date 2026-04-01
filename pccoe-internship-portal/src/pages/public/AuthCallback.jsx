@@ -53,6 +53,14 @@ export default function AuthCallback() {
     const handleSession = async (session) => {
       const currentUser = session.user
       
+      // Validate email domain - only @pccoepune.org users allowed
+      if (!currentUser.email || !currentUser.email.endsWith('@pccoepune.org')) {
+        toast.error('Access denied. Only @pccoepune.org email addresses are allowed.')
+        await supabase.auth.signOut()
+        navigate('/login', { replace: true })
+        return
+      }
+      
       setStatus('Checking profile status...')
       
       // 1. Is this user an Admin?

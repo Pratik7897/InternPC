@@ -126,6 +126,11 @@ export const useAuthStore = create((set, get) => ({
   signIn: async (email, password, isStudent) => {
     if (!isSupabaseConfigured) return { error: 'Database connection missing. Contact administrator.' }
 
+    // Validate email domain - only @pccoepune.org users allowed
+    if (!email || !email.endsWith('@pccoepune.org')) {
+      return { error: 'Access denied. Only @pccoepune.org email addresses are allowed.' }
+    }
+
     set({ isLoading: true })
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
@@ -202,6 +207,11 @@ export const useAuthStore = create((set, get) => ({
 
   signUp: async (email, password, fullName, prnNumber, branch, currentYear) => {
     if (!isSupabaseConfigured) return { error: 'Database connection missing. Contact administrator.' }
+
+    // Validate email domain - only @pccoepune.org users allowed
+    if (!email || !email.endsWith('@pccoepune.org')) {
+      return { error: 'Access denied. Only @pccoepune.org email addresses are allowed.' }
+    }
 
     set({ isLoading: true })
     try {
