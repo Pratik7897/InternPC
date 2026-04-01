@@ -20,8 +20,9 @@ export default function InternshipsManagement() {
 
   // Form State
   const [formData, setFormData] = useState({
-    title: '', company_name: '', description: '', requirements: '', 
-    stipend: '', location: '', deadline: '', is_featured: false
+    title: '', company_name: '', description: '', requirements: '',
+    stipend: '', location: '', work_mode: '', duration: '', deadline: '',
+    apply_link: '', is_featured: false
   })
   
   useEffect(() => {
@@ -70,11 +71,12 @@ export default function InternshipsManagement() {
         company_name: formData.company_name,
         description: formData.description,
         requirements: formData.requirements.split(',').map(s => s.trim()).filter(Boolean),
-        stipend: formData.stipend,
-        location: formData.location,
-        work_mode: 'Hybrid', // defaulting for simplicity
-        duration: '6 Months', // defaulting for simplicity
-        deadline: formData.deadline,
+        stipend: formData.stipend || null,
+        location: formData.location || null,
+        work_mode: formData.work_mode || 'Onsite',
+        duration: formData.duration || null,
+        deadline: formData.deadline || null,
+        apply_link: formData.apply_link || null,
         is_featured: formData.is_featured,
         is_active: true,
         posted_by: user.id
@@ -85,7 +87,7 @@ export default function InternshipsManagement() {
       setInternships([data[0], ...internships])
       setIsModalOpen(false)
       toast.success('Internship published successfully.')
-      setFormData({ title: '', company_name: '', description: '', requirements: '', stipend: '', location: '', deadline: '', is_featured: false })
+      setFormData({ title: '', company_name: '', description: '', requirements: '', stipend: '', location: '', work_mode: '', duration: '', deadline: '', apply_link: '', is_featured: false })
     } catch (error) {
       toast.error('Failed to publish internship')
     } finally {
@@ -210,16 +212,37 @@ export default function InternshipsManagement() {
                         <Input placeholder="React, Node.js, SQL" className="mt-1" value={formData.requirements} onChange={e => setFormData({...formData, requirements: e.target.value})} />
                     </div>
                     <div>
-                        <Label>Stipend</Label>
-                        <Input placeholder="e.g. ₹20,000 / month" className="mt-1" value={formData.stipend} onChange={e => setFormData({...formData, stipend: e.target.value})} />
+                        <Label>Stipend <span className="text-text-secondary text-xs">(optional)</span></Label>
+                        <Input placeholder="e.g. ₹20,000 / month or Unpaid" className="mt-1" value={formData.stipend} onChange={e => setFormData({...formData, stipend: e.target.value})} />
                     </div>
                     <div>
                         <Label>Location</Label>
                         <Input placeholder="e.g. Pune / Remote" className="mt-1" value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} />
                     </div>
                     <div>
+                        <Label>Work Mode</Label>
+                        <select
+                          value={formData.work_mode}
+                          onChange={e => setFormData({...formData, work_mode: e.target.value})}
+                          className="flex h-10 w-full mt-1 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring text-foreground"
+                        >
+                          <option value="" className="bg-background">Select Mode</option>
+                          <option value="Remote" className="bg-background">Remote</option>
+                          <option value="Onsite" className="bg-background">Onsite</option>
+                          <option value="Hybrid" className="bg-background">Hybrid</option>
+                        </select>
+                    </div>
+                    <div>
+                        <Label>Duration</Label>
+                        <Input placeholder="e.g. 2 months, 6 weeks" className="mt-1" value={formData.duration} onChange={e => setFormData({...formData, duration: e.target.value})} />
+                    </div>
+                    <div>
                         <Label>Application Deadline</Label>
                         <Input type="date" className="mt-1" required value={formData.deadline} onChange={e => setFormData({...formData, deadline: e.target.value})} />
+                    </div>
+                    <div>
+                        <Label>Apply Link <span className="text-text-secondary text-xs">(optional)</span></Label>
+                        <Input placeholder="https://company.com/apply" className="mt-1" value={formData.apply_link} onChange={e => setFormData({...formData, apply_link: e.target.value})} />
                     </div>
                     <div className="md:col-span-2 flex items-center gap-3 p-4 border border-accent-gold/30 bg-accent-gold/5 rounded-xl">
                        <input type="checkbox" id="featured" className="w-4 h-4 rounded border-white/20 bg-white/5 text-accent-gold focus:ring-accent-gold" checked={formData.is_featured} onChange={e => setFormData({...formData, is_featured: e.target.checked})} />

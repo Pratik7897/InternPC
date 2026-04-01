@@ -368,10 +368,14 @@ export default function BrowseInternships() {
 
               <div className="mt-auto border-t border-white/10 pt-4 flex items-center justify-between">
                 <p className="text-xs text-text-secondary">
-                  {job.is_gmail ? `Received: ${job.deadline}` : `Deadline: ${job.deadline || '—'}`}
+                  {job.is_gmail
+                    ? (job.deadline !== job.received_date
+                        ? `Deadline: ${job.deadline}`
+                        : `Received: ${job.received_date || job.deadline}`)
+                    : `Deadline: ${job.deadline || '—'}`}
                 </p>
                 <span className="text-sm font-medium text-accent-blue flex items-center gap-1 group-hover:gap-2 transition-all">
-                  {job.is_gmail ? 'Open Email' : 'View Details'}
+                  {job.is_gmail ? (job.has_apply_link ? 'Apply / Email' : 'Open Email') : 'View Details'}
                   <ChevronRight className="w-4 h-4" />
                 </span>
               </div>
@@ -438,23 +442,39 @@ export default function BrowseInternships() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 glass rounded-xl">
                   <div>
                     <p className="text-xs text-text-secondary mb-1">Stipend</p>
-                    <p className="font-medium text-sm">{selectedJob.stipend || '—'}</p>
+                    <p className={`font-medium text-sm ${selectedJob.stipend === 'See Email' ? 'text-text-secondary italic' : 'text-text-primary'}`}>
+                      {selectedJob.stipend || '—'}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-text-secondary mb-1">Duration</p>
-                    <p className="font-medium text-sm">{selectedJob.duration || '—'}</p>
+                    <p className={`font-medium text-sm ${selectedJob.duration === 'See Email' ? 'text-text-secondary italic' : 'text-text-primary'}`}>
+                      {selectedJob.duration || '—'}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-text-secondary mb-1">Location</p>
-                    <p className="font-medium text-sm">{selectedJob.location || '—'}</p>
+                    <p className={`font-medium text-sm ${selectedJob.location === 'See Email' ? 'text-text-secondary italic' : 'text-text-primary'}`}>
+                      {selectedJob.location || '—'}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-text-secondary mb-1">
-                      {selectedJob.is_gmail ? 'Received' : 'Deadline'}
+                      {selectedJob.is_gmail
+                        ? (selectedJob.deadline !== selectedJob.received_date ? 'Deadline' : 'Received')
+                        : 'Deadline'}
                     </p>
                     <p className="font-medium text-sm">{selectedJob.deadline || '—'}</p>
                   </div>
                 </div>
+
+                {/* Extra row for Gmail: show received date if deadline was extracted */}
+                {selectedJob.is_gmail && selectedJob.received_date && selectedJob.deadline !== selectedJob.received_date && (
+                  <div className="flex items-center gap-2 text-xs text-text-secondary px-1">
+                    <Mail className="w-3 h-3" />
+                    Email received: {selectedJob.received_date}
+                  </div>
+                )}
 
                 {/* Description */}
                 {selectedJob.description && (
@@ -485,20 +505,34 @@ export default function BrowseInternships() {
                 <div className="border-t border-white/10 pt-6 mt-6">
                   {selectedJob.is_gmail ? (
                     <>
+                      {/* Show info about what was auto-detected */}
                       <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl mb-4 text-sm text-blue-300">
                         <p className="font-semibold mb-1 flex items-center gap-2">
-                          <Mail className="w-4 h-4" /> This internship was found in your Gmail inbox
+                          <Mail className="w-4 h-4" /> From your Gmail inbox
                         </p>
-                        <p>Open the original email to see full details — contact info, application process, and requirements are in there.</p>
+                        <p>
+                          {selectedJob.has_apply_link
+                            ? 'An application link was found in this email. Click "Apply Directly" to open it.'
+                            : 'Open the original email to see full details — contact info, application process, and requirements are in there.'}
+                        </p>
                       </div>
-                      <div className="flex gap-4">
+                      <div className="flex gap-3 flex-wrap">
+                        {selectedJob.has_apply_link && (
+                          <Button
+                            onClick={() => window.open(selectedJob.apply_link, '_blank')}
+                            className="flex-1 shadow-[var(--glow)] gap-2 min-w-[150px]"
+                          >
+                            <ExternalLink className="w-4 h-4" /> Apply Directly
+                          </Button>
+                        )}
                         <Button
-                          onClick={() => window.open(selectedJob.apply_link, '_blank')}
-                          className="flex-1 shadow-[var(--glow)] gap-2"
+                          variant={selectedJob.has_apply_link ? 'outline' : 'default'}
+                          onClick={() => window.open(`https://mail.google.com/mail/u/0/#inbox/${selectedJob.id.replace('gmail-', '')}`, '_blank')}
+                          className={`flex-1 gap-2 min-w-[150px] ${!selectedJob.has_apply_link ? 'shadow-[var(--glow)]' : ''}`}
                         >
-                          <ExternalLink className="w-4 h-4" /> Open in Gmail
+                          <Mail className="w-4 h-4" /> Open in Gmail
                         </Button>
-                        <Button variant="outline" onClick={() => setSelectedJob(null)} className="flex-1">
+                        <Button variant="ghost" onClick={() => setSelectedJob(null)} className="flex-1 min-w-[80px]">
                           Close
                         </Button>
                       </div>
