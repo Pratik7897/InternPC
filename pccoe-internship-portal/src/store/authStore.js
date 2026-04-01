@@ -159,8 +159,8 @@ export const useAuthStore = create((set, get) => ({
       }
 
       if (provider === 'google') {
-        // Request Gmail read-only scope
-        options.scopes = 'https://www.googleapis.com/auth/gmail.readonly'
+        // Only request basic profile/email scopes (no sensitive permissions)
+        // This allows the OAuth app to be published without Google verification
         options.queryParams = {
           prompt: 'select_account',
           hd: 'pccoepune.org',

@@ -14,6 +14,8 @@ export default function InternshipsManagement() {
   const [internships, setInternships] = useState([])
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [deleteTarget, setDeleteTarget] = useState(null) // { id, title } of internship to delete
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // Form State
   const [formData, setFormData] = useState({
@@ -42,14 +44,19 @@ export default function InternshipsManagement() {
     }
   }
 
-  const handleDelete = async (id) => {
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setIsDeleting(true)
     try {
-      const { error } = await supabase.from('internships').delete().eq('id', id)
+      const { error } = await supabase.from('internships').delete().eq('id', deleteTarget.id)
       if (error) throw error
-      setInternships(internships.filter(i => i.id !== id))
-      toast.success('Internship deleted.')
+      setInternships(internships.filter(i => i.id !== deleteTarget.id))
+      toast.success(`"${deleteTarget.title}" deleted successfully.`)
+      setDeleteTarget(null)
     } catch (error) {
       toast.error('Failed to delete internship')
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -139,14 +146,19 @@ export default function InternshipsManagement() {
                     )}
                   </td>
                   <td className="p-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
+                     <div className="flex items-center justify-end gap-2">
                        <Button size="icon" variant="ghost" className="h-8 w-8 text-text-secondary hover:text-white" onClick={() => setIsModalOpen(true)}>
                          <Edit2 className="w-4 h-4"/>
                        </Button>
-                       <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleDelete(job.id)}>
+                       <Button
+                         size="icon"
+                         variant="ghost"
+                         className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                         onClick={() => setDeleteTarget({ id: job.id, title: job.title })}
+                       >
                          <Trash2 className="w-4 h-4"/>
                        </Button>
-                    </div>
+                     </div>
                   </td>
                 </motion.tr>
               ))}
@@ -211,6 +223,69 @@ export default function InternshipsManagement() {
                  <Button type="submit" form="post-job-form" className="shadow-[var(--glow)]">Publish Internship</Button>
               </div>
 
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {deleteTarget && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+              onClick={() => !isDeleting && setDeleteTarget(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-md glass-card border border-red-500/20 bg-secondary/95 shadow-2xl rounded-2xl p-6"
+            >
+              {/* Icon */}
+              <div className="w-14 h-14 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="w-7 h-7 text-red-400" />
+              </div>
+
+              <h3 className="text-xl font-heading font-bold text-center mb-2">Delete Internship?</h3>
+              <p className="text-text-secondary text-sm text-center mb-1">
+                You are about to permanently delete:
+              </p>
+              <p className="text-center font-semibold text-white mb-1">&ldquo;{deleteTarget.title}&rdquo;</p>
+              <p className="text-xs text-red-400/80 text-center mb-6">
+                ⚠️ This will also remove all student applications for this role. This action cannot be undone.
+              </p>
+
+              <div className="flex gap-3">
+                <Button
+                  variant="ghost"
+                  className="flex-1"
+                  onClick={() => setDeleteTarget(null)}
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1 bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 hover:border-red-500/50"
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? (
+                    <span className="flex items-center gap-2">
+                      <span className="w-4 h-4 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
+                      Deleting...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <Trash2 className="w-4 h-4" />
+                      Yes, Delete
+                    </span>
+                  )}
+                </Button>
+              </div>
             </motion.div>
           </div>
         )}
