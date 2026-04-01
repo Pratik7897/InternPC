@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { useEffect } from 'react'
+import toast from 'react-hot-toast'
 
 // Layouts implies some wrapping components
 import StudentLayout from './components/layout/StudentLayout'
@@ -47,6 +48,22 @@ function App() {
   const { checkSession, isLoading } = useAuthStore()
 
   useEffect(() => {
+    // Check for OAuth error params in URL (e.g. bad_oauth_state after failed Google login)
+    const params = new URLSearchParams(window.location.search)
+    const errorCode = params.get('error_code')
+    const errorDesc = params.get('error_description')
+
+    if (errorCode) {
+      console.warn('OAuth error in URL:', errorCode, errorDesc)
+      // Clear any stale Supabase tokens from localStorage
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('sb-')) localStorage.removeItem(key)
+      })
+      // Clean up the URL and redirect to login
+      window.history.replaceState({}, '', '/')
+      toast.error('Login session expired or cancelled. Please try again.', { duration: 4000 })
+    }
+
     checkSession()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

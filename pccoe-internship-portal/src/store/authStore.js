@@ -39,6 +39,14 @@ export const useAuthStore = create((set, get) => ({
 
       if (error) {
         console.warn('Session check error:', error)
+        // If the refresh token is invalid/expired, force sign out and clear storage
+        if (error.message?.includes('Refresh Token') || error.message?.includes('refresh_token')) {
+          console.warn('Stale refresh token detected — clearing session.')
+          await supabase.auth.signOut()
+          clearProviderToken()
+          set({ user: null, role: null, providerToken: null, isLoading: false })
+          return
+        }
       }
 
       if (session?.user) {
@@ -48,7 +56,6 @@ export const useAuthStore = create((set, get) => ({
           .eq('id', session.user.id)
           .maybeSingle()
 
-        // Use provider_token from session if available, else fall back to localStorage
         const freshToken = session.provider_token || loadProviderToken()
         if (session.provider_token) {
           saveProviderToken(session.provider_token)
@@ -66,6 +73,9 @@ export const useAuthStore = create((set, get) => ({
       }
     } catch (err) {
       console.error('Initial session check failed:', err)
+      // On any unrecoverable auth error, wipe everything and let user re-login
+      clearProviderToken()
+      await supabase.auth.signOut().catch(() => {})
       set({ user: null, role: null, providerToken: null, isLoading: false })
     }
 
