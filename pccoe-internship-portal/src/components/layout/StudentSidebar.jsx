@@ -17,6 +17,7 @@ const navItems = [
 export default function StudentSidebar() {
   const { signOut, user } = useAuthStore()
   const [completionPercentage, setCompletionPercentage] = useState(0)
+  const [hasUnread, setHasUnread] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -31,6 +32,37 @@ export default function StudentSidebar() {
       }
     }
     fetchCompletion()
+
+    const checkNotifications = async () => {
+      // Check localStorage flags
+      const profileAbandoned = localStorage.getItem('profile_form_started')
+      const appAbandoned = localStorage.getItem('internship_app_started')
+      
+      const readIds = new Set(JSON.parse(localStorage.getItem('read_notification_ids') || '[]'))
+      
+      if ((profileAbandoned && !readIds.has('smart-abandoned-form')) || 
+          (appAbandoned && !readIds.has('smart-abandoned-app'))) {
+        setHasUnread(true)
+        return
+      }
+
+      // Check application count
+      const { data } = await supabase
+        .from('applications')
+        .select('id')
+        .eq('student_id', user.id)
+        .limit(1)
+
+      if ((!data || data.length === 0) && !readIds.has('smart-no-applications')) {
+        setHasUnread(true)
+      } else {
+        setHasUnread(false)
+      }
+    }
+    checkNotifications()
+    // Poll every 30s to keep it fresh
+    const interval = setInterval(checkNotifications, 30000)
+    return () => clearInterval(interval)
   }, [user])
 
   return (
@@ -47,15 +79,20 @@ export default function StudentSidebar() {
             to={item.path}
             className={({ isActive }) =>
               cn(
-                'flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-sm font-medium',
+                'flex items-center justify-between px-4 py-3 rounded-lg transition-all duration-200 text-sm font-medium',
                 isActive
                   ? 'bg-accent-blue/10 text-accent-blue border-l-2 border-accent-blue shadow-[var(--glow)]'
                   : 'text-text-secondary hover:bg-white/5 hover:text-text-primary'
               )
             }
           >
-            <item.icon className="w-5 h-5" />
-            {item.label}
+            <div className="flex items-center gap-3">
+              <item.icon className="w-5 h-5" />
+              {item.label}
+            </div>
+            {item.label === 'Notifications' && hasUnread && (
+              <span className="w-2 h-2 rounded-full bg-accent-blue shadow-[0_0_10px_rgba(59,130,246,0.6)]"></span>
+            )}
           </NavLink>
         ))}
       </nav>

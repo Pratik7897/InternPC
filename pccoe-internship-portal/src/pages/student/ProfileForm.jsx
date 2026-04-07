@@ -149,6 +149,7 @@ export default function ProfileForm() {
 
       console.log('✅ Profile saved successfully!')
       setSavedOk(true)
+      localStorage.removeItem('profile_form_started')
       toast.success(`Profile saved! ${completion}% complete`, { icon: '✅' })
 
       // Reload fresh from DB to confirm the save worked
@@ -162,7 +163,12 @@ export default function ProfileForm() {
   }
 
   // ─── Update field helper ──────────────────────────────────────────────────
-  const update = (field) => (e) => setFormData(prev => ({ ...prev, [field]: e.target.value }))
+  const update = (field) => (e) => {
+    if (!localStorage.getItem('profile_form_started')) {
+      localStorage.setItem('profile_form_started', Date.now().toString())
+    }
+    setFormData(prev => ({ ...prev, [field]: e.target.value }))
+  }
   const selectClass = "flex h-10 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mt-1 text-foreground"
 
   // ─── Loading state while fetching initial data ────────────────────────────

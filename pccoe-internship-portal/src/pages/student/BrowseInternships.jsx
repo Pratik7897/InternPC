@@ -94,8 +94,19 @@ export default function BrowseInternships() {
       setAppliedJobs(prev => new Set([...prev, selectedJob.id]))
       setSelectedJob(null)
       setCoverNote('')
+      localStorage.removeItem('internship_app_started')
     } catch (error) {
       toast.error(error.message || 'Application failed.')
+    }
+  }
+
+  const handleCoverNoteChange = (e) => {
+    const val = e.target.value
+    setCoverNote(val)
+    if (val.trim() && !localStorage.getItem('internship_app_started')) {
+      localStorage.setItem('internship_app_started', Date.now().toString())
+    } else if (!val.trim()) {
+      localStorage.removeItem('internship_app_started')
     }
   }
 
@@ -431,7 +442,7 @@ export default function BrowseInternships() {
                       </p>
                       <textarea
                         value={coverNote}
-                        onChange={e => setCoverNote(e.target.value)}
+                        onChange={handleCoverNoteChange}
                         placeholder="Why are you a good fit?"
                         className="w-full h-24 rounded-lg bg-white/5 border border-white/10 p-3 text-sm focus:ring-2 focus:ring-accent-blue outline-none resize-none mb-4"
                       ></textarea>
