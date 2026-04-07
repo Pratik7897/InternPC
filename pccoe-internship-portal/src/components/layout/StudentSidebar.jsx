@@ -15,12 +15,13 @@ const navItems = [
 ]
 
 export default function StudentSidebar() {
-  const { signOut, user } = useAuthStore()
-  const [completionPercentage, setCompletionPercentage] = useState(0)
+  const { signOut, user, profileCompletion, setProfileCompletion } = useAuthStore()
   const [hasUnread, setHasUnread] = useState(false)
 
+  // Real-time profile completion sync
   useEffect(() => {
     if (!user) return
+
     const fetchCompletion = async () => {
       const { data } = await supabase
         .from('profiles')
@@ -28,16 +29,33 @@ export default function StudentSidebar() {
         .eq('id', user.id)
         .maybeSingle()
       if (data?.profile_completion != null) {
-        setCompletionPercentage(data.profile_completion)
+        setProfileCompletion(data.profile_completion)
       }
     }
     fetchCompletion()
 
+    const channel = supabase
+      .channel(`profile-completion-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },
+        (payload) => {
+          if (payload.new?.profile_completion != null) {
+            setProfileCompletion(payload.new.profile_completion)
+          }
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [user, setProfileCompletion])
+
+  // Smart notifications badge logic
+  useEffect(() => {
+    if (!user) return
     const checkNotifications = async () => {
-      // Check localStorage flags
       const profileAbandoned = localStorage.getItem('profile_form_started')
       const appAbandoned = localStorage.getItem('internship_app_started')
-      
       const readIds = new Set(JSON.parse(localStorage.getItem('read_notification_ids') || '[]'))
       
       if ((profileAbandoned && !readIds.has('smart-abandoned-form')) || 
@@ -46,7 +64,6 @@ export default function StudentSidebar() {
         return
       }
 
-      // Check application count
       const { data } = await supabase
         .from('applications')
         .select('id')
@@ -59,8 +76,8 @@ export default function StudentSidebar() {
         setHasUnread(false)
       }
     }
+    
     checkNotifications()
-    // Poll every 30s to keep it fresh
     const interval = setInterval(checkNotifications, 30000)
     return () => clearInterval(interval)
   }, [user])
@@ -111,7 +128,7 @@ export default function StudentSidebar() {
               <path
                 className="text-accent-blue transition-all duration-700"
                 strokeWidth="3"
-                strokeDasharray={`${completionPercentage}, 100`}
+                strokeDasharray={`${profileCompletion}, 100`}
                 strokeLinecap="round"
                 stroke="currentColor"
                 fill="none"
@@ -119,12 +136,12 @@ export default function StudentSidebar() {
               />
             </svg>
             <div className="absolute inset-0 flex items-center justify-center text-xs font-bold">
-              {completionPercentage}%
+              {profileCompletion}%
             </div>
           </div>
           <p className="text-xs text-text-secondary">Profile Completion</p>
         </div>
-        {/* Bottom Actions */}
+        
         <div className="p-4 border-t border-white/10 shrink-0">
           <button
             onClick={() => signOut()}

@@ -7,22 +7,14 @@ import { Badge } from '../../components/ui/Badge'
 import { useAuthStore } from '../../store/authStore'
 import { supabase } from '../../lib/supabase'
 
-const profileSteps = [
-  { id: 1, label: 'Basic Information', completed: true, link: '/student/profile?step=1' },
-  { id: 2, label: 'Academic Details', completed: true, link: '/student/profile?step=2' },
-  { id: 3, label: 'Skills & Experience', completed: false, link: '/student/profile?step=3' },
-  { id: 4, label: 'Upload Documents', completed: false, link: '/student/upload' }
-]
 
-const recentAnnouncements = [
-  { id: 1, title: 'TCS Ninja Hiring 2026 Batch', date: '2 hours ago', type: 'urgent' },
-  { id: 2, title: 'Resume Review Workshop', date: 'Yesterday', type: 'event' }
-]
 
 export default function StudentDashboard() {
   const { user } = useAuthStore()
   const [profile, setProfile] = useState(null)
   const [stats, setStats] = useState({ applied: 0, shortlisted: 0, newInternships: 0 })
+  const [featuredRoles, setFeaturedRoles] = useState([])
+  const [announcements, setAnnouncements] = useState([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -52,8 +44,31 @@ export default function StudentDashboard() {
         .eq('student_id', user.id)
         .in('status', ['shortlisted', 'under_review', 'selected'])
 
-      // Fetch Active Internships Count
-      const { data: activeData } = await supabase.from('internships').select('id').eq('is_active', true)
+      // Fetch Active Internships Count (includes null is_active since those are newly posted)
+      const { data: activeData } = await supabase
+        .from('internships')
+        .select('id')
+        .neq('is_active', false)
+
+      // Fetch featured roles for the dashboard widget
+      const { data: featuredData } = await supabase
+        .from('internships')
+        .select('id, title, company_name, location, work_mode')
+        .eq('is_featured', true)
+        .neq('is_active', false)
+        .order('created_at', { ascending: false })
+        .limit(3)
+
+      setFeaturedRoles(featuredData || [])
+
+      // Fetch latest announcements
+      const { data: announcementsData } = await supabase
+        .from('announcements')
+        .select('id, title, type, created_at')
+        .order('created_at', { ascending: false })
+        .limit(5)
+
+      setAnnouncements(announcementsData || [])
 
       setStats({
         applied: appliedData?.length || 0,
@@ -179,16 +194,28 @@ export default function StudentDashboard() {
                 <span>Featured Roles</span>
                 <Link to="/student/internships" className="text-xs text-accent-blue font-medium hover:underline flex items-center">View All <ArrowRight className="w-3 h-3 ml-1" /></Link>
               </h2>
-              <div className="space-y-4 flex-1">
-                {[1,2,3].map(i => (
-                  <div key={i} className="group p-3 border border-white/5 bg-white/5 rounded-xl hover:border-white/20 transition-all flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium text-sm">Software Engineer Intern</h4>
-                      <p className="text-xs text-text-secondary mt-0.5">Google • Remote</p>
-                    </div>
-                    <Badge variant="outline" className="opacity-0 group-hover:opacity-100 transition-opacity text-xs bg-accent-blue/10 text-accent-blue border-accent-blue/20">Apply</Badge>
+              <div className="space-y-3 flex-1">
+                {featuredRoles.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full py-6 text-center">
+                    <Briefcase className="w-8 h-8 text-text-secondary/30 mb-2" />
+                    <p className="text-text-secondary text-sm">No featured internships yet.</p>
+                    <Link to="/student/internships" className="text-xs text-accent-blue mt-1 hover:underline">Browse all listings</Link>
                   </div>
-                ))}
+                ) : (
+                  featuredRoles.map(role => (
+                    <Link
+                      key={role.id}
+                      to="/student/internships"
+                      className="group p-3 border border-white/5 bg-white/5 rounded-xl hover:border-accent-blue/30 hover:bg-white/10 transition-all flex items-center justify-between"
+                    >
+                      <div>
+                        <h4 className="font-medium text-sm text-text-primary">{role.title}</h4>
+                        <p className="text-xs text-text-secondary mt-0.5">{role.company_name}{role.location ? ` • ${role.location}` : ''}</p>
+                      </div>
+                      <Badge variant="outline" className="opacity-0 group-hover:opacity-100 transition-opacity text-xs bg-accent-gold/10 text-accent-gold border-accent-gold/30">⭐ Featured</Badge>
+                    </Link>
+                  ))
+                )}
               </div>
             </motion.div>
 
@@ -198,20 +225,30 @@ export default function StudentDashboard() {
                 <span>Recent Updates</span>
               </h2>
               <div className="space-y-4 flex-1">
-                {recentAnnouncements.map(ann => (
-                  <div key={ann.id} className="flex gap-4">
-                    <div className="mt-1">
-                      {ann.type === 'urgent' ? 
-                        <div className="w-2 h-2 rounded-full bg-destructive shadow-[0_0_10px_rgba(239,68,68,0.5)]"></div> : 
-                        <div className="w-2 h-2 rounded-full bg-accent-blue"></div>
-                      }
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-sm text-text-primary leading-tight">{ann.title}</h4>
-                      <p className="text-xs text-text-secondary mt-1 flex items-center gap-1"><Clock className="w-3 h-3" /> {ann.date}</p>
-                    </div>
+                {announcements.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full py-6 text-center">
+                    <Bell className="w-8 h-8 text-text-secondary/30 mb-2" />
+                    <p className="text-text-secondary text-sm">No announcements yet.</p>
                   </div>
-                ))}
+                ) : (
+                  announcements.map(ann => (
+                    <div key={ann.id} className="flex gap-4">
+                      <div className="mt-1">
+                        {ann.type === 'urgent' ? 
+                          <div className="w-2 h-2 rounded-full bg-destructive shadow-[0_0_10px_rgba(239,68,68,0.5)]"></div> : 
+                          <div className="w-2 h-2 rounded-full bg-accent-blue"></div>
+                        }
+                      </div>
+                      <div>
+                        <h4 className="font-medium text-sm text-text-primary leading-tight">{ann.title}</h4>
+                        <p className="text-xs text-text-secondary mt-1 flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {new Date(ann.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
               <Link to="/student/notifications" className="block text-center text-xs text-text-secondary hover:text-white pt-4 mt-auto border-t border-white/5">View all notifications</Link>
             </motion.div>

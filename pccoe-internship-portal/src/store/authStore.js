@@ -26,6 +26,8 @@ export const useAuthStore = create((set, get) => ({
   role: null, // 'student' | 'admin'
   providerToken: loadProviderToken(), // Restore from localStorage immediately
   isLoading: true, // Start true while we check initial session
+  profileCompletion: 0, // 0-100, updated after profile save
+  setProfileCompletion: (pct) => set({ profileCompletion: pct }),
 
   // Method to check active session on refresh
   checkSession: async () => {
@@ -39,6 +41,14 @@ export const useAuthStore = create((set, get) => ({
 
       if (error) {
         console.warn('Session check error:', error)
+        // If the refresh token is invalid/expired, force sign out and clear storage
+        if (error.message?.includes('Refresh Token') || error.message?.includes('refresh_token')) {
+          console.warn('Stale refresh token detected — clearing session.')
+          await supabase.auth.signOut()
+          clearProviderToken()
+          set({ user: null, role: null, providerToken: null, isLoading: false })
+          return
+        }
       }
 
       if (session?.user) {
@@ -48,7 +58,6 @@ export const useAuthStore = create((set, get) => ({
           .eq('id', session.user.id)
           .maybeSingle()
 
-        // Use provider_token from session if available, else fall back to localStorage
         const freshToken = session.provider_token || loadProviderToken()
         if (session.provider_token) {
           saveProviderToken(session.provider_token)
@@ -66,6 +75,9 @@ export const useAuthStore = create((set, get) => ({
       }
     } catch (err) {
       console.error('Initial session check failed:', err)
+      // On any unrecoverable auth error, wipe everything and let user re-login
+      clearProviderToken()
+      await supabase.auth.signOut().catch(() => {})
       set({ user: null, role: null, providerToken: null, isLoading: false })
     }
 
@@ -114,6 +126,11 @@ export const useAuthStore = create((set, get) => ({
   signIn: async (email, password, isStudent) => {
     if (!isSupabaseConfigured) return { error: 'Database connection missing. Contact administrator.' }
 
+    // Validate email domain - only @pccoepune.org users allowed
+    if (!email || !email.endsWith('@pccoepune.org')) {
+      return { error: 'Access denied. Only @pccoepune.org email addresses are allowed.' }
+    }
+
     set({ isLoading: true })
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
@@ -159,8 +176,8 @@ export const useAuthStore = create((set, get) => ({
       }
 
       if (provider === 'google') {
-        // Request Gmail read-only scope
-        options.scopes = 'https://www.googleapis.com/auth/gmail.readonly'
+        // Request gmail.readonly scope so we can fetch internship emails
+        options.scopes = 'email profile openid https://www.googleapis.com/auth/gmail.readonly'
         options.queryParams = {
           prompt: 'select_account',
           hd: 'pccoepune.org',
@@ -190,6 +207,11 @@ export const useAuthStore = create((set, get) => ({
 
   signUp: async (email, password, fullName, prnNumber, branch, currentYear) => {
     if (!isSupabaseConfigured) return { error: 'Database connection missing. Contact administrator.' }
+
+    // Validate email domain - only @pccoepune.org users allowed
+    if (!email || !email.endsWith('@pccoepune.org')) {
+      return { error: 'Access denied. Only @pccoepune.org email addresses are allowed.' }
+    }
 
     set({ isLoading: true })
     try {

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, MapPin, DollarSign, Briefcase, X, ChevronRight, RefreshCw, Mail, ExternalLink, Loader2 } from 'lucide-react'
+import { Search, MapPin, DollarSign, Briefcase, X, ChevronRight, RefreshCw, EyeOff, Eye, Mail, ExternalLink, AlertCircle } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
 import { Input } from '../../components/ui/Input'
@@ -12,71 +12,86 @@ import { fetchGmailInternships } from '../../lib/gmail'
 export default function BrowseInternships() {
   const { user, providerToken } = useAuthStore()
   const [search, setSearch] = useState('')
-  const [internships, setInternships] = useState([])
+  const HIDDEN_KEY = `hidden_internships_${user?.id}`
+  
+  const [portalJobs, setPortalJobs] = useState([])
+  const [gmailJobs, setGmailJobs] = useState([])
+  const [hiddenJobs, setHiddenJobs] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(HIDDEN_KEY) || '[]')) }
+    catch { return new Set() }
+  })
+  
   const [appliedJobs, setAppliedJobs] = useState(new Set())
   const [selectedJob, setSelectedJob] = useState(null)
   const [coverNote, setCoverNote] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
-  const [isGmailLoading, setIsGmailLoading] = useState(false)
-  const [gmailCount, setGmailCount] = useState(0)
-  const [activeFilter, setActiveFilter] = useState('all') // 'all' | 'portal' | 'gmail'
+  const [isLoadingPortal, setIsLoadingPortal] = useState(true)
+  const [isLoadingGmail, setIsLoadingGmail] = useState(false)
+  const [activeFilter, setActiveFilter] = useState('all') // 'all' | 'portal' | 'gmail' | 'hidden'
 
-  useEffect(() => {
-    if (user) {
-      fetchInternships()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, providerToken])
-
-  const fetchInternships = async () => {
-    setIsLoading(true)
+  const fetchPortalInternships = useCallback(async () => {
+    if (!user) return
+    setIsLoadingPortal(true)
     try {
-      // 1. Always fetch active internships from Supabase
       const { data: jobsData, error: jobsError } = await supabase
         .from('internships')
         .select('*')
-        .eq('is_active', true)
+        .neq('is_active', false)
         .order('created_at', { ascending: false })
 
       if (jobsError) throw jobsError
 
-      // 2. Fetch student's existing applications
       const { data: appliedData } = await supabase
         .from('applications')
         .select('internship_id')
         .eq('student_id', user.id)
 
       setAppliedJobs(new Set((appliedData || []).map(app => app.internship_id)))
-
-      const portalJobs = jobsData || []
-
-      // 3. If they have a Google token, fetch Gmail internships
-      let gmailJobs = []
-      if (providerToken) {
-        setIsGmailLoading(true)
-        try {
-          gmailJobs = await fetchGmailInternships(providerToken)
-          setGmailCount(gmailJobs.length)
-          if (gmailJobs.length > 0) {
-            toast.success(`Found ${gmailJobs.length} internship email${gmailJobs.length > 1 ? 's' : ''} from your Gmail!`, {
-              icon: '📧',
-              duration: 3000
-            })
-          }
-        } catch (gmailErr) {
-          console.error('Gmail fetch failed:', gmailErr)
-        } finally {
-          setIsGmailLoading(false)
-        }
-      }
-
-      // Portal listings first, Gmail emails after
-      setInternships([...portalJobs, ...gmailJobs])
+      setPortalJobs(jobsData || [])
     } catch (error) {
-      toast.error('Failed to load internships.')
-      console.error(error)
+      toast.error('Failed to load portal internships.')
+      console.error('[BrowseInternships] Portal Error:', error)
     } finally {
-      setIsLoading(false)
+      setIsLoadingPortal(false)
+    }
+  }, [user])
+
+  const fetchGmail = useCallback(async (token) => {
+    if (!token) return
+    setIsLoadingGmail(true)
+    try {
+      const emails = await fetchGmailInternships(token)
+      setGmailJobs(emails)
+    } catch (err) {
+      console.error('[Gmail] Error fetching internships:', err)
+    } finally {
+      setIsLoadingGmail(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (user) {
+      fetchPortalInternships()
+      const token = providerToken || localStorage.getItem('gmail_provider_token')
+      if (token) fetchGmail(token)
+    }
+  }, [user?.id, fetchPortalInternships, fetchGmail, providerToken])
+
+  const handleRefresh = async () => {
+    await fetchPortalInternships()
+    const token = providerToken || localStorage.getItem('gmail_provider_token')
+    if (token) await fetchGmail(token)
+    else toast('No Gmail token — sign out and re-login with Google to enable Gmail sync.', { icon: 'ℹ️' })
+  }
+
+  const handleCoverNoteChange = (e) => {
+    const val = e.target.value
+    setCoverNote(val)
+    if (val.trim()) {
+      if (!localStorage.getItem('internship_app_started')) {
+        localStorage.setItem('internship_app_started', Date.now().toString())
+      }
+    } else {
+      localStorage.removeItem('internship_app_started')
     }
   }
 
@@ -100,30 +115,52 @@ export default function BrowseInternships() {
     }
   }
 
-  const handleCoverNoteChange = (e) => {
-    const val = e.target.value
-    setCoverNote(val)
-    if (val.trim() && !localStorage.getItem('internship_app_started')) {
-      localStorage.setItem('internship_app_started', Date.now().toString())
-    } else if (!val.trim()) {
-      localStorage.removeItem('internship_app_started')
-    }
+  const hideJob = (e, jobId) => {
+    e.stopPropagation()
+    const updated = new Set([...hiddenJobs, jobId])
+    setHiddenJobs(updated)
+    localStorage.setItem(HIDDEN_KEY, JSON.stringify([...updated]))
+    toast('Internship hidden. You can restore it anytime.', { icon: '🙈' })
   }
 
-  // Filter internships based on search and active tab
-  const filteredInternships = internships.filter(job => {
-    const matchSearch =
-      job.title?.toLowerCase().includes(search.toLowerCase()) ||
-      job.company_name?.toLowerCase().includes(search.toLowerCase())
-    const matchFilter =
-      activeFilter === 'all' ||
-      (activeFilter === 'gmail' && job.is_gmail) ||
-      (activeFilter === 'portal' && !job.is_gmail)
-    return matchSearch && matchFilter
+  const restoreJob = (e, jobId) => {
+    e.stopPropagation()
+    const updated = new Set(hiddenJobs)
+    updated.delete(jobId)
+    setHiddenJobs(updated)
+    localStorage.setItem(HIDDEN_KEY, JSON.stringify([...updated]))
+    toast.success('Internship restored!')
+  }
+
+  const unhideAll = () => {
+    setHiddenJobs(new Set())
+    localStorage.removeItem(HIDDEN_KEY)
+    setActiveFilter('all')
+    toast.success('All hidden internships restored!')
+  }
+
+  // All jobs combined (portal + gmail), excluding hidden ones
+  const allJobs = [...portalJobs, ...gmailJobs]
+  const visibleJobs = allJobs.filter(job => !hiddenJobs.has(job.id))
+  const hiddenJobsList = allJobs.filter(job => hiddenJobs.has(job.id))
+
+  const getFilteredList = () => {
+    if (activeFilter === 'hidden') return hiddenJobsList
+    if (activeFilter === 'portal') return portalJobs.filter(job => !hiddenJobs.has(job.id))
+    if (activeFilter === 'gmail') return gmailJobs.filter(job => !hiddenJobs.has(job.id))
+    return visibleJobs // 'all'
+  }
+
+  const filteredInternships = getFilteredList().filter(job => {
+    const q = search.toLowerCase()
+    return (
+      job.title?.toLowerCase().includes(q) ||
+      job.company_name?.toLowerCase().includes(q)
+    )
   })
 
-  const portalCount = internships.filter(j => !j.is_gmail).length
-  const totalGmailCount = internships.filter(j => j.is_gmail).length
+  const isLoading = isLoadingPortal
+  const hasToken = !!(providerToken || localStorage.getItem('gmail_provider_token'))
 
   return (
     <div className="space-y-6">
@@ -132,8 +169,7 @@ export default function BrowseInternships() {
         <div>
           <h1 className="text-3xl font-heading font-bold text-text-primary">Browse Internships</h1>
           <p className="text-text-secondary mt-1">
-            Discover opportunities from the portal
-            {providerToken && ' and your Gmail inbox'}.
+            Discover opportunities from the portal{hasToken ? ' and your Gmail inbox' : ''}.
           </p>
         </div>
         <div className="flex gap-3">
@@ -148,77 +184,65 @@ export default function BrowseInternships() {
           </div>
           <Button
             variant="outline"
-            onClick={fetchInternships}
-            disabled={isLoading}
+            onClick={handleRefresh}
+            disabled={isLoadingPortal || isLoadingGmail}
             className="gap-2 shrink-0"
           >
-            <RefreshCw className={`w-4 h-4 ${isLoading || isGmailLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${(isLoadingPortal || isLoadingGmail) ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>
       </div>
 
-      {/* Gmail Connect Banner (only shown if no Google token) */}
-      {!providerToken && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass-card p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border border-amber-500/20 bg-amber-500/5"
-        >
-          <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
-              <Mail className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-amber-300">Connect Gmail to see more internships</p>
-              <p className="text-xs text-text-secondary mt-0.5">
-                Log in with your PCCOE Google account to automatically see internship emails like "Hiring", "Off-Campus", "Internship Opportunity" from your inbox.
-              </p>
-            </div>
+      {!hasToken && (
+        <div className="flex items-start gap-3 p-4 bg-accent-blue/10 border border-accent-blue/20 rounded-xl text-sm text-accent-blue">
+          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold mb-0.5">Gmail Sync Unavailable</p>
+            <p className="text-text-secondary">
+              Sign out and re-login with your Google account to also see internship emails from your Gmail inbox.
+            </p>
           </div>
-          <a
-            href="/login"
-            className="shrink-0 text-xs font-medium text-amber-300 border border-amber-500/30 bg-amber-500/10 px-4 py-2 rounded-lg hover:bg-amber-500/20 transition-colors whitespace-nowrap"
-          >
-            Sign in with Google →
-          </a>
-        </motion.div>
-      )}
-
-      {/* Gmail Loading indicator */}
-      {isGmailLoading && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="flex items-center gap-3 p-3 glass-card border border-blue-500/20 bg-blue-500/5 text-sm text-blue-300"
-        >
-          <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-          <span>Scanning your Gmail for internship emails with keywords: <strong>Internship, Hiring, Off-Campus, Recruitment...</strong></span>
-        </motion.div>
+        </div>
       )}
 
       {/* Filter Tabs */}
-      <div className="flex gap-2 flex-wrap">
-        {[
-          { key: 'all', label: `All (${internships.length})` },
-          { key: 'portal', label: `Portal (${portalCount})` },
-          ...(providerToken ? [{ key: 'gmail', label: `Gmail (${totalGmailCount})` }] : [])
-        ].map(tab => (
+      <div className="flex items-center gap-2 flex-wrap justify-between">
+        <div className="flex gap-2 flex-wrap">
+          {[
+            { key: 'all', label: `All (${visibleJobs.length})` },
+            { key: 'portal', label: `Portal (${portalJobs.filter(j => !hiddenJobs.has(j.id)).length})` },
+            ...(hasToken ? [{ key: 'gmail', label: `Gmail${isLoadingGmail ? ' ⟳' : ` (${gmailJobs.filter(j => !hiddenJobs.has(j.id)).length})`}` }] : []),
+            ...(hiddenJobs.size > 0 ? [{ key: 'hidden', label: `Hidden (${hiddenJobs.size})` }] : [])
+          ].map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveFilter(tab.key)}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
+                activeFilter === tab.key
+                  ? tab.key === 'hidden'
+                    ? 'bg-white/20 text-white'
+                    : tab.key === 'gmail'
+                      ? 'bg-blue-500/30 text-blue-300 shadow-[0_0_10px_rgba(59,130,246,0.2)]'
+                      : 'bg-accent-blue text-white shadow-[var(--glow)]'
+                  : 'bg-white/5 text-text-secondary hover:bg-white/10 hover:text-white border border-white/10'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        {hiddenJobs.size > 0 && (
           <button
-            key={tab.key}
-            onClick={() => setActiveFilter(tab.key)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
-              activeFilter === tab.key
-                ? 'bg-accent-blue text-white shadow-[var(--glow)]'
-                : 'bg-white/5 text-text-secondary hover:bg-white/10 hover:text-white border border-white/10'
-            }`}
+            onClick={unhideAll}
+            className="flex items-center gap-1.5 text-xs text-text-secondary hover:text-white transition-colors px-3 py-1.5 rounded-full border border-white/10 hover:bg-white/5"
           >
-            {tab.label}
+            <Eye className="w-3.5 h-3.5" />
+            Restore all hidden
           </button>
-        ))}
+        )}
       </div>
 
-      {/* Internship Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {isLoading ? (
           <div className="col-span-2 flex flex-col items-center justify-center p-20 gap-4">
@@ -229,12 +253,13 @@ export default function BrowseInternships() {
           <div className="col-span-2 text-center py-20">
             <Briefcase className="w-16 h-16 text-text-secondary mx-auto mb-4 opacity-30" />
             <p className="text-text-secondary text-lg">
-              {search ? `No results for "${search}"` : 'No internships found.'}
-            </p>
-            <p className="text-text-secondary text-sm mt-2">
-              {!providerToken
-                ? 'Sign in with Google to also see internship emails from your PCCOE Gmail.'
-                : 'Try refreshing or check back later.'}
+              {search
+                ? `No results for "${search}"`
+                : activeFilter === 'hidden'
+                  ? 'No hidden internships.'
+                  : activeFilter === 'gmail'
+                    ? isLoadingGmail ? 'Loading Gmail internships...' : 'No internship emails found in your Gmail inbox.'
+                    : 'No internships available right now.'}
             </p>
           </div>
         ) : (
@@ -243,29 +268,49 @@ export default function BrowseInternships() {
               key={job.id}
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="glass-card p-6 flex flex-col cursor-pointer border hover:border-accent-blue/50 transition-all duration-200 hover:shadow-[0_0_20px_rgba(59,130,246,0.1)] group"
+              exit={{ opacity: 0, scale: 0.9 }}
+              className={`glass-card p-6 flex flex-col cursor-pointer border hover:border-accent-blue/50 transition-all duration-200 group relative ${
+                job.is_gmail ? 'hover:shadow-[0_0_20px_rgba(59,130,246,0.15)]' : 'hover:shadow-[0_0_20px_rgba(59,130,246,0.1)]'
+              }`}
               onClick={() => setSelectedJob(job)}
             >
+              {job.is_gmail && (
+                <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500/0 via-blue-500/60 to-blue-500/0 rounded-t-xl" />
+              )}
+
               <div className="flex justify-between items-start mb-4">
                 <div className="w-12 h-12 bg-white/10 rounded-lg p-1.5 shrink-0 flex items-center justify-center overflow-hidden">
                   <img
                     src={job.company_logo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(job.company_name || 'C')}&background=1e3a5f&color=60a5fa&bold=true`}
                     alt={job.company_name}
                     className="w-full h-full object-contain"
-                    onError={e => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent((job.company_name || 'C').charAt(0))}&background=1e3a5f&color=60a5fa&bold=true` }}
                   />
                 </div>
                 <div className="flex gap-2 items-center">
+                  {job.is_gmail && (
+                    <Badge className="bg-blue-500/10 text-blue-400 border border-blue-500/20 text-xs flex items-center gap-1">
+                      <Mail className="w-3 h-3" /> Gmail
+                    </Badge>
+                  )}
+                  {activeFilter !== 'hidden' && (
+                    <button
+                      onClick={(e) => hideJob(e, job.id)}
+                      title="Hide"
+                      className="p-1.5 rounded-lg bg-white/5 hover:bg-red-500/20 text-text-secondary hover:text-red-400 transition-colors border border-white/10 hover:border-red-500/30"
+                    >
+                      <EyeOff className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                   {appliedJobs.has(job.id) && (
                     <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">Applied ✓</Badge>
                   )}
-                  {job.is_featured && !appliedJobs.has(job.id) && (
-                    <Badge className="bg-accent-gold/20 text-accent-gold border-accent-gold/30">Featured</Badge>
-                  )}
-                  {job.is_gmail && (
-                    <Badge className="bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center gap-1">
-                      <Mail className="w-3 h-3" /> Gmail
-                    </Badge>
+                  {activeFilter === 'hidden' && (
+                    <button
+                      onClick={(e) => restoreJob(e, job.id)}
+                      className="p-1.5 rounded-lg bg-white/5 hover:bg-emerald-500/20 text-text-secondary hover:text-emerald-400 transition-colors"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                    </button>
                   )}
                 </div>
               </div>
@@ -273,33 +318,24 @@ export default function BrowseInternships() {
               <h3 className="text-lg font-heading font-bold mb-1 group-hover:text-accent-blue transition-colors line-clamp-2">{job.title}</h3>
               <p className="text-accent-blue font-medium text-sm mb-4">{job.company_name}</p>
 
-              {job.description && (
-                <p className="text-xs text-text-secondary mb-4 line-clamp-2 flex-1">{job.description}</p>
-              )}
-
               <div className="flex flex-wrap gap-3 text-xs text-text-secondary mb-4">
-                <span className="flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-accent-blue/70" />
-                  {job.location}
-                  {job.work_mode && job.work_mode !== 'See Email' && ` (${job.work_mode})`}
-                </span>
-                {job.stipend && job.stipend !== 'See Email' && (
+                {job.location && (
+                  <span className="flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-accent-blue/70" />
+                    {job.location}
+                  </span>
+                )}
+                {job.stipend && (
                   <span className="flex items-center gap-1.5">
                     <DollarSign className="w-3.5 h-3.5 text-accent-teal/70" />
                     {job.stipend}
-                  </span>
-                )}
-                {job.duration && job.duration !== 'See Email' && (
-                  <span className="flex items-center gap-1.5">
-                    <Briefcase className="w-3.5 h-3.5 text-accent-gold/70" />
-                    {job.duration}
                   </span>
                 )}
               </div>
 
               <div className="mt-auto border-t border-white/10 pt-4 flex items-center justify-between">
                 <p className="text-xs text-text-secondary">
-                  {job.is_gmail ? `Received: ${job.deadline}` : `Deadline: ${job.deadline}`}
+                  Deadline: {job.deadline || '—'}
                 </p>
                 <span className="text-sm font-medium text-accent-blue flex items-center gap-1 group-hover:gap-2 transition-all">
                   {job.is_gmail ? 'Open Email' : 'View Details'}
@@ -311,7 +347,6 @@ export default function BrowseInternships() {
         )}
       </div>
 
-      {/* Detail Modal */}
       <AnimatePresence>
         {selectedJob && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -331,115 +366,47 @@ export default function BrowseInternships() {
             >
               <div className="sticky top-0 bg-secondary/80 backdrop-blur-md border-b border-white/10 p-4 flex items-center justify-between z-10">
                 <h3 className="font-heading font-bold text-lg flex items-center gap-2">
-                  {selectedJob.is_gmail && <Mail className="w-5 h-5 text-blue-400" />}
-                  {selectedJob.is_gmail ? 'Email Internship' : 'Internship Details'}
+                  {selectedJob.is_gmail ? 'Gmail Internship' : 'Internship Details'}
                 </h3>
-                <button
-                  onClick={() => setSelectedJob(null)}
-                  className="p-2 hover:bg-white/10 rounded-full transition-colors"
-                >
+                <button onClick={() => setSelectedJob(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               <div className="p-6 md:p-8 space-y-6">
                 <div className="flex items-start gap-5">
-                  <div className="w-16 h-16 bg-white/10 rounded-xl p-2 shrink-0 border border-white/10 flex items-center justify-center">
-                    <img
-                      src={selectedJob.company_logo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedJob.company_name || 'C')}&background=1e3a5f&color=60a5fa&bold=true`}
-                      alt={selectedJob.company_name}
-                      className="w-full h-full object-contain"
-                      onError={e => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent((selectedJob.company_name || 'C').charAt(0))}&background=1e3a5f&color=60a5fa&bold=true` }}
-                    />
+                   <div className="w-16 h-16 bg-white/10 rounded-xl p-2 shrink-0 border border-white/10 flex items-center justify-center">
+                    <img src={selectedJob.company_logo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedJob.company_name || 'C')}`} className="w-full h-full object-contain" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold font-heading leading-tight">{selectedJob.title}</h2>
-                    <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      <p className="text-accent-blue text-lg">{selectedJob.company_name}</p>
-                      {selectedJob.is_gmail && (
-                        <Badge className="bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center gap-1 text-xs">
-                          <Mail className="w-3 h-3" /> From Gmail Inbox
-                        </Badge>
-                      )}
-                    </div>
+                    <h2 className="text-2xl font-bold font-heading">{selectedJob.title}</h2>
+                    <p className="text-accent-blue text-lg">{selectedJob.company_name}</p>
                   </div>
                 </div>
 
-                {/* Details Grid */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 glass rounded-xl">
-                  <div>
-                    <p className="text-xs text-text-secondary mb-1">Stipend</p>
-                    <p className="font-medium text-sm">{selectedJob.stipend || '—'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-text-secondary mb-1">Duration</p>
-                    <p className="font-medium text-sm">{selectedJob.duration || '—'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-text-secondary mb-1">Location</p>
-                    <p className="font-medium text-sm">{selectedJob.location || '—'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-text-secondary mb-1">
-                      {selectedJob.is_gmail ? 'Received' : 'Deadline'}
-                    </p>
-                    <p className="font-medium text-sm">{selectedJob.deadline || '—'}</p>
-                  </div>
+                  <div><p className="text-xs text-text-secondary mb-1">Stipend</p><p className="text-sm">{selectedJob.stipend || '—'}</p></div>
+                  <div><p className="text-xs text-text-secondary mb-1">Duration</p><p className="text-sm">{selectedJob.duration || '—'}</p></div>
+                  <div><p className="text-xs text-text-secondary mb-1">Location</p><p className="text-sm">{selectedJob.location || '—'}</p></div>
+                  <div><p className="text-xs text-text-secondary mb-1">Deadline</p><p className="text-sm">{selectedJob.deadline || '—'}</p></div>
                 </div>
 
-                {/* Description */}
-                {selectedJob.description && (
-                  <div>
-                    <h3 className="text-lg font-bold mb-2">
-                      {selectedJob.is_gmail ? 'Email Preview' : 'Description'}
-                    </h3>
-                    <p className="text-text-secondary leading-relaxed text-sm">{selectedJob.description}</p>
-                  </div>
-                )}
+                <div>
+                  <h3 className="text-lg font-bold mb-2">Description</h3>
+                  <p className="text-text-secondary text-sm leading-relaxed">{selectedJob.description}</p>
+                </div>
 
-                {/* Skills / Requirements (portal listings only) */}
-                {!selectedJob.is_gmail && (selectedJob.requirements?.length > 0 || selectedJob.skills_required?.length > 0) && (
-                  <div>
-                    <h3 className="text-lg font-bold mb-3">Requirements & Skills</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedJob.requirements?.map(req => (
-                        <Badge key={req} variant="outline">{req}</Badge>
-                      ))}
-                      {selectedJob.skills_required?.map(skill => (
-                        <Badge key={skill} variant="outline" className="border-accent-blue text-accent-blue">{skill}</Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Action Area */}
                 <div className="border-t border-white/10 pt-6 mt-6">
                   {selectedJob.is_gmail ? (
-                    <>
-                      <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl mb-4 text-sm text-blue-300">
-                        <p className="font-semibold mb-1 flex items-center gap-2">
-                          <Mail className="w-4 h-4" /> This internship was found in your Gmail
-                        </p>
-                        <p>The email has details like contact info, skills required, and how to apply. Open the original email to read everything and apply directly.</p>
-                      </div>
-                      <div className="flex gap-4">
-                        <Button
-                          onClick={() => window.open(selectedJob.apply_link, '_blank')}
-                          className="flex-1 shadow-[var(--glow)] gap-2"
-                        >
-                          <ExternalLink className="w-4 h-4" /> Open in Gmail
-                        </Button>
-                        <Button variant="outline" onClick={() => setSelectedJob(null)} className="flex-1">
-                          Close
-                        </Button>
-                      </div>
-                    </>
+                    <div className="flex gap-3">
+                      {selectedJob.has_apply_link && (
+                        <Button onClick={() => window.open(selectedJob.apply_link, '_blank')} className="flex-1 shadow-[var(--glow)]">Apply Directly</Button>
+                      )}
+                      <Button variant="outline" onClick={() => window.open(`https://mail.google.com/mail/u/0/#inbox/${selectedJob.id.replace('gmail-', '')}`, '_blank')} className="flex-1">Open in Gmail</Button>
+                    </div>
                   ) : !appliedJobs.has(selectedJob.id) ? (
                     <>
-                      <h3 className="text-lg font-bold mb-3">Apply for this role</h3>
-                      <p className="text-sm text-text-secondary mb-3">
-                        Add a brief cover note (optional). Your profile, resume, and video will be shared automatically.
-                      </p>
+                      <h3 className="text-lg font-bold mb-3">Apply Now</h3>
                       <textarea
                         value={coverNote}
                         onChange={handleCoverNoteChange}
@@ -447,18 +414,12 @@ export default function BrowseInternships() {
                         className="w-full h-24 rounded-lg bg-white/5 border border-white/10 p-3 text-sm focus:ring-2 focus:ring-accent-blue outline-none resize-none mb-4"
                       ></textarea>
                       <div className="flex gap-4">
-                        <Button onClick={handleApply} className="flex-1 shadow-[var(--glow)]">
-                          Submit Application
-                        </Button>
-                        <Button variant="outline" onClick={() => setSelectedJob(null)} className="flex-1">
-                          Cancel
-                        </Button>
+                        <Button onClick={handleApply} className="flex-1 shadow-[var(--glow)]">Submit Application</Button>
+                        <Button variant="outline" onClick={() => setSelectedJob(null)} className="flex-1">Cancel</Button>
                       </div>
                     </>
                   ) : (
-                    <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-center font-medium">
-                      You have already applied for this role. Check the Applications tab for updates.
-                    </div>
+                    <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-center">Already Applied ✓</div>
                   )}
                 </div>
               </div>

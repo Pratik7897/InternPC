@@ -24,11 +24,14 @@ export default function UploadCenter() {
   const [pendingCertFile, setPendingCertFile] = useState(null)
 
   useEffect(() => {
-    fetchProfile()
-  }, [])
+    if (user?.id) fetchProfile()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id])
 
   const fetchProfile = async () => {
-    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
+    if (!user?.id) return
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
+    if (error) console.error('UploadCenter fetchProfile error:', error)
     if (data) setProfile(data)
   }
 
