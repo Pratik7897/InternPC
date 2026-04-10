@@ -154,7 +154,7 @@ export const useAuthStore = create((set, get) => ({
       return { success: true, role: actualRole }
     } catch (error) {
       if (error.message.includes('Invalid login credentials')) {
-        return { error: 'Invalid email or password. Are you sure you registered?' }
+        return { error: 'Invalid email or password. If you signed up with Google, please use the "Sign in with Google" button instead.' }
       }
       return { error: error.message }
     } finally {
@@ -176,8 +176,8 @@ export const useAuthStore = create((set, get) => ({
       }
 
       if (provider === 'google') {
-        // Request gmail.readonly scope so we can fetch internship emails
-        options.scopes = 'email profile openid https://www.googleapis.com/auth/gmail.readonly'
+        // Request basic scopes to avoid triggering Google unverified app warning
+        options.scopes = 'email profile openid'
         options.queryParams = {
           prompt: 'select_account',
           hd: 'pccoepune.org',

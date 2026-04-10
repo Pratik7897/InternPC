@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -7,86 +7,103 @@ import toast from 'react-hot-toast'
 export default function AuthCallback() {
   const navigate = useNavigate()
   const setUser = useAuthStore(state => state.setUser)
-  const [status, setStatus] = useState('Authenticating...')
+  const [status, setStatus] = useState('Completing sign-in...')
+  const [errorMsg, setErrorMsg] = useState(null)
+  // Guard against running the exchange twice (React StrictMode double-invoke)
+  const hasRun = useRef(false)
 
   useEffect(() => {
-    // Check if there is an error snippet in the URL from a rejected Google Login
-    const urlParams = new URLSearchParams(window.location.search)
-    const errorDesc = urlParams.get('error_description')
-    
-    if (errorDesc) {
-      toast.error(`Authentication Failed: ${errorDesc}`)
-      navigate('/login', { replace: true })
-      return
-    }
+    if (hasRun.current) return
+    hasRun.current = true
 
     const processAuth = async () => {
       try {
-        setStatus('Verifying session details...')
-        
-        // Small delay to allow Supabase to exchange the code for a session
-        await new Promise(resolve => setTimeout(resolve, 500))
-        
-        const { data: { session }, error } = await supabase.auth.getSession()
+        // Check for explicit OAuth errors passed back in the URL query string
+        const urlParams = new URLSearchParams(window.location.search)
+        const errorCode = urlParams.get('error')
+        const errorDesc = urlParams.get('error_description')
 
-        if (error) throw error
-
-        if (!session?.user) {
-          // Sometimes the session exchange takes a moment; try once more
-          await new Promise(resolve => setTimeout(resolve, 1000))
-          const { data: { session: retrySession }, error: retryError } = await supabase.auth.getSession()
-          if (retryError || !retrySession?.user) {
-            throw new Error('No user session found after login. Please try again.')
-          }
-          // Use retry session
-          return handleSession(retrySession)
+        if (errorCode) {
+          const msg = errorDesc
+            ? decodeURIComponent(errorDesc.replace(/\+/g, ' '))
+            : 'Authentication was cancelled or failed.'
+          setErrorMsg(msg)
+          toast.error(msg)
+          setTimeout(() => navigate('/login', { replace: true }), 2500)
+          return
         }
 
-        return handleSession(session)
+        // Supabase PKCE: exchange the `code` in the URL for a real session
+        const code = urlParams.get('code')
+
+        let session = null
+
+        if (code) {
+          setStatus('Exchanging credentials...')
+          const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+          if (error) throw error
+          session = data.session
+        } else {
+          // Fallback: hash-based implicit flow (older Supabase setups)
+          setStatus('Verifying session...')
+          const { data, error } = await supabase.auth.getSession()
+          if (error) throw error
+          session = data.session
+        }
+
+        if (!session?.user) {
+          throw new Error('No user session found. Please try signing in again.')
+        }
+
+        await handleSession(session)
       } catch (err) {
-        console.error('Callback error:', err)
-        toast.error(err.message || 'Error occurred during login synchronization.')
-        navigate('/login', { replace: true })
+        console.error('Auth callback error:', err)
+        const msg = err.message || 'An error occurred during sign-in. Please try again.'
+        setErrorMsg(msg)
+        toast.error(msg)
+        setTimeout(() => navigate('/login', { replace: true }), 2500)
       }
     }
 
     const handleSession = async (session) => {
       const currentUser = session.user
-      
-      // Validate email domain - only @pccoepune.org users allowed
+
+      // Domain enforcement: only @pccoepune.org is allowed
       if (!currentUser.email || !currentUser.email.endsWith('@pccoepune.org')) {
-        toast.error('Access denied. Only @pccoepune.org email addresses are allowed.')
         await supabase.auth.signOut()
-        navigate('/login', { replace: true })
+        const msg = 'Access denied. Only @pccoepune.org email addresses are allowed.'
+        setErrorMsg(msg)
+        toast.error(msg)
+        setTimeout(() => navigate('/login', { replace: true }), 2500)
         return
       }
-      
-      setStatus('Checking profile status...')
-      
-      // 1. Is this user an Admin?
+
+      setStatus('Checking your account...')
+
+      // Determine role
       const { data: adminData } = await supabase
         .from('admin_users')
         .select('id')
         .eq('id', currentUser.id)
         .maybeSingle()
 
-      // Save the provider token from the session (it's only available right after OAuth)
+      const role = adminData ? 'admin' : 'student'
       const providerToken = session.provider_token || null
+
       if (providerToken) {
         localStorage.setItem('gmail_provider_token', providerToken)
-        console.log('Saved Gmail provider token to localStorage.')
       }
 
-      if (adminData) {
+      if (role === 'admin') {
         setUser(currentUser, 'admin', providerToken)
-        toast.success('Admin login successful')
+        toast.success('Welcome back, Admin!')
         navigate('/admin/dashboard', { replace: true })
         return
       }
 
-      // 2. If Student, ensure they have a profile row
-      setStatus('Syncing student profile...')
-      
+      // Student: ensure a profile row exists
+      setStatus('Setting up your profile...')
+
       const { data: existingProfile } = await supabase
         .from('profiles')
         .select('id')
@@ -94,7 +111,6 @@ export default function AuthCallback() {
         .maybeSingle()
 
       if (!existingProfile) {
-        // Create the foundational profile row for the new OAuth user
         const { error: insertError } = await supabase.from('profiles').insert({
           id: currentUser.id,
           email: currentUser.email,
@@ -103,28 +119,42 @@ export default function AuthCallback() {
         })
 
         if (insertError && insertError.code !== '23505') {
-          // 23505 = unique violation (profile already exists), ignore it
-          console.error('Failed to create profile row:', insertError)
+          console.error('Profile creation failed:', insertError)
         }
       }
 
-      // 3. Update global Zustand state and forward to student dashboard
       setUser(currentUser, 'student', providerToken)
-      toast.success('Login successful! Welcome back.')
+      toast.success('Login successful! Welcome to the portal.')
       navigate('/student/dashboard', { replace: true })
     }
 
     processAuth()
-  }, [navigate, setUser])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
       <div className="glass-card p-8 md:p-12 text-center max-w-md w-full flex flex-col items-center space-y-6">
-        <div className="w-16 h-16 border-4 border-white/10 border-t-accent-blue rounded-full animate-spin"></div>
-        <div>
-          <h2 className="text-2xl font-heading font-bold text-text-primary mb-2">Securely Logging In</h2>
-          <p className="text-text-secondary">{status}</p>
-        </div>
+        {errorMsg ? (
+          <>
+            <div className="w-16 h-16 rounded-full bg-red-500/20 border border-red-500/40 flex items-center justify-center text-3xl">
+              ✕
+            </div>
+            <div>
+              <h2 className="text-2xl font-heading font-bold text-text-primary mb-2">Login Failed</h2>
+              <p className="text-text-secondary text-sm">{errorMsg}</p>
+              <p className="text-text-secondary text-xs mt-2 opacity-60">Redirecting you back...</p>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="w-16 h-16 border-4 border-white/10 border-t-accent-blue rounded-full animate-spin" />
+            <div>
+              <h2 className="text-2xl font-heading font-bold text-text-primary mb-2">Securely Logging In</h2>
+              <p className="text-text-secondary">{status}</p>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
