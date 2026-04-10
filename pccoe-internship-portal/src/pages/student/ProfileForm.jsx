@@ -1,3 +1,4 @@
+// DEBUG: Force git change detection
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check, ChevronRight, ChevronLeft, Save, Loader2, CheckCircle2 } from 'lucide-react'
