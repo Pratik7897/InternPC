@@ -247,6 +247,9 @@ export const fetchGmailInternships = async (providerToken) => {
       if (listRes.status === 401) {
         console.warn('Gmail: Token expired or invalid. Please re-login with Google.')
         localStorage.removeItem('gmail_provider_token')
+      } else if (listRes.status === 403) {
+        console.warn('Gmail: Access forbidden (403). Gmail scopes might be missing.')
+        return { error: 'INSIGHT_SCOPE_MISSING', status: 403 }
       } else {
         console.warn(`Gmail API error ${listRes.status}:`, errText)
       }

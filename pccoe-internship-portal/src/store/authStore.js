@@ -162,7 +162,7 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
-  signInWithOAuth: async (provider) => {
+  signInWithOAuth: async (provider, customOptions = {}) => {
     if (!isSupabaseConfigured) return { error: 'Database connection missing. Contact administrator. Ensure Vercel environment variables are set.' }
 
     try {
@@ -172,16 +172,21 @@ export const useAuthStore = create((set, get) => ({
       await supabase.auth.signOut()
 
       const options = {
-        redirectTo: window.location.origin + '/auth/callback'
+        redirectTo: window.location.origin + '/auth/callback',
+        ...customOptions
       }
 
       if (provider === 'google') {
-        // Request basic scopes to avoid triggering Google unverified app warning
-        options.scopes = 'email profile openid'
+        // Default to basic scopes, but allow override for Gmail sync
+        if (!options.scopes) {
+          options.scopes = 'email profile openid'
+        }
+        
         options.queryParams = {
           prompt: 'select_account',
           hd: 'pccoepune.org',
-          access_type: 'offline'
+          access_type: 'offline',
+          ...customOptions.queryParams
         }
       }
 

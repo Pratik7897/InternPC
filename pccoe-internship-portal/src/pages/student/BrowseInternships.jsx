@@ -26,6 +26,7 @@ export default function BrowseInternships() {
   const [coverNote, setCoverNote] = useState('')
   const [isLoadingPortal, setIsLoadingPortal] = useState(true)
   const [isLoadingGmail, setIsLoadingGmail] = useState(false)
+  const [gmailScopeMissing, setGmailScopeMissing] = useState(false)
   const [activeFilter, setActiveFilter] = useState('all') // 'all' | 'portal' | 'gmail' | 'hidden'
 
   const fetchPortalInternships = useCallback(async () => {
@@ -58,9 +59,16 @@ export default function BrowseInternships() {
   const fetchGmail = useCallback(async (token) => {
     if (!token) return
     setIsLoadingGmail(true)
+    setGmailScopeMissing(false)
     try {
-      const emails = await fetchGmailInternships(token)
-      setGmailJobs(emails)
+      const result = await fetchGmailInternships(token)
+      if (result && result.error === 'INSIGHT_SCOPE_MISSING') {
+        console.warn('[Gmail] Scopes missing, prompted user to re-link.')
+        setGmailScopeMissing(true)
+        setGmailJobs([])
+      } else {
+        setGmailJobs(result || [])
+      }
     } catch (err) {
       console.error('[Gmail] Error fetching internships:', err)
     } finally {
@@ -81,6 +89,17 @@ export default function BrowseInternships() {
     const token = providerToken || localStorage.getItem('gmail_provider_token')
     if (token) await fetchGmail(token)
     else toast('No Gmail token — sign out and re-login with Google to enable Gmail sync.', { icon: 'ℹ️' })
+  }
+
+  const handleConnectGmail = async () => {
+    const { signInWithOAuth } = useAuthStore.getState()
+    toast.loading('Redirecting to Google for Gmail access...')
+    const res = await signInWithOAuth('google', {
+      scopes: 'email profile openid https://www.googleapis.com/auth/gmail.readonly'
+    })
+    if (res && res.error) {
+      toast.error(res.error)
+    }
   }
 
   const handleCoverNoteChange = (e) => {
@@ -194,15 +213,25 @@ export default function BrowseInternships() {
         </div>
       </div>
 
-      {!hasToken && (
-        <div className="flex items-start gap-3 p-4 bg-accent-blue/10 border border-accent-blue/20 rounded-xl text-sm text-accent-blue">
-          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-          <div>
-            <p className="font-semibold mb-0.5">Gmail Sync Unavailable</p>
-            <p className="text-text-secondary">
-              Sign out and re-login with your Google account to also see internship emails from your Gmail inbox.
-            </p>
+      {(!hasToken || gmailScopeMissing) && (
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-5 bg-blue-500/10 border border-blue-500/20 rounded-2xl">
+          <div className="flex items-start gap-3 text-sm text-blue-300">
+            <Mail className="w-5 h-5 shrink-0 mt-0.5 text-blue-400" />
+            <div>
+              <p className="font-semibold mb-1 text-white">Unlock Gmail Internship Discovery</p>
+              <p className="text-blue-200/70">
+                {gmailScopeMissing 
+                  ? "Your current session doesn't have permission to read emails. Grant access to find more opportunities."
+                  : "Connect your PCCOE Gmail to automatically find internship opportunities from your inbox."}
+              </p>
+            </div>
           </div>
+          <Button 
+            onClick={handleConnectGmail} 
+            className="shrink-0 bg-blue-600 hover:bg-blue-500 text-white border-none shadow-[0_0_15px_rgba(37,99,235,0.4)]"
+          >
+            {gmailScopeMissing ? 'Fix Permissions' : 'Connect Gmail'}
+          </Button>
         </div>
       )}
 
