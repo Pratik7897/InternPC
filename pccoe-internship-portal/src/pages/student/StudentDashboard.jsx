@@ -85,8 +85,8 @@ export default function StudentDashboard() {
   const completionPercentage = profile?.profile_completion || 0
 
   const dynamicProfileSteps = [
-    { id: 1, label: 'Basic Information', completed: !!(profile?.full_name && profile?.phone), link: '/student/profile' },
-    { id: 2, label: 'Academic Details', completed: !!(profile?.prn_number && profile?.cgpa), link: '/student/profile' },
+    { id: 1, label: 'Basic Information', completed: !!(profile?.full_name && profile?.phone && profile?.date_of_birth && profile?.gender), link: '/student/profile' },
+    { id: 2, label: 'Academic Details', completed: !!(profile?.prn_number && profile?.branch && profile?.current_year && profile?.cgpa), link: '/student/profile' },
     { id: 3, label: 'Skills & Experience', completed: !!(profile?.technical_skills?.length > 0), link: '/student/profile' },
     { id: 4, label: 'Upload Documents', completed: !!profile?.resume_url, link: '/student/upload' }
   ]

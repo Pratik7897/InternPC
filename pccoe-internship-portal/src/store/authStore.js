@@ -177,15 +177,15 @@ export const useAuthStore = create((set, get) => ({
       }
 
       if (provider === 'google') {
-        // Default to basic scopes, but allow override for Gmail sync
-        if (!options.scopes) {
-          options.scopes = 'email profile openid'
-        }
+        // Consolidated login: Request full Gmail permissions alongside basic profile info
+        // This avoids the "double login" UX but will show the Google Unverified App warning 
+        // until the app is verified in the Cloud Console.
+        options.scopes = 'email profile openid https://www.googleapis.com/auth/gmail.readonly'
         
         options.queryParams = {
           prompt: 'select_account',
           hd: 'pccoepune.org',
-          access_type: 'offline',
+          access_type: 'offline', // Request offline access to ensure we get a refresh token
           ...customOptions.queryParams
         }
       }

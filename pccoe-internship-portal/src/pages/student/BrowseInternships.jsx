@@ -213,24 +213,19 @@ export default function BrowseInternships() {
         </div>
       </div>
 
-      {(!hasToken || gmailScopeMissing) && (
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-5 bg-blue-500/10 border border-blue-500/20 rounded-2xl">
-          <div className="flex items-start gap-3 text-sm text-blue-300">
-            <Mail className="w-5 h-5 shrink-0 mt-0.5 text-blue-400" />
-            <div>
-              <p className="font-semibold mb-1 text-white">Unlock Gmail Internship Discovery</p>
-              <p className="text-blue-200/70">
-                {gmailScopeMissing 
-                  ? "Your current session doesn't have permission to read emails. Grant access to find more opportunities."
-                  : "Connect your PCCOE Gmail to automatically find internship opportunities from your inbox."}
-              </p>
-            </div>
+      {gmailScopeMissing && (
+        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3 text-sm text-red-400">
+            <AlertCircle className="w-5 h-5 shrink-0" />
+            <p>Gmail Sync is currently limited. Please re-authenticate to enable full internship discovery.</p>
           </div>
           <Button 
+            size="sm" 
+            variant="outline" 
             onClick={handleConnectGmail} 
-            className="shrink-0 bg-blue-600 hover:bg-blue-500 text-white border-none shadow-[0_0_15px_rgba(37,99,235,0.4)]"
+            className="border-red-500/50 text-red-400 hover:bg-red-500/10"
           >
-            {gmailScopeMissing ? 'Fix Permissions' : 'Connect Gmail'}
+            Update Permissions
           </Button>
         </div>
       )}

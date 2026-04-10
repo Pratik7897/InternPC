@@ -87,13 +87,6 @@ export default function ProfileForm() {
     setIsSaving(true)
     setSavedOk(false)
     try {
-      const fields = [
-        formData.fullName, formData.phone, formData.dob, formData.gender,
-        formData.prn, formData.branch, formData.year, formData.cgpa, formData.techSkills
-      ]
-      const filled = fields.filter(f => f && f.toString().trim() !== '').length
-      const completion = Math.round((filled / fields.length) * 100)
-
       const payload = {
         id: user.id,
         email: user.email,
@@ -110,7 +103,6 @@ export default function ProfileForm() {
         active_backlogs: formData.backlogs ? parseInt(formData.backlogs, 10) : 0,
         technical_skills: formData.techSkills ? formData.techSkills.split(',').map(s => s.trim()).filter(Boolean) : [],
         soft_skills: formData.softSkills ? formData.softSkills.split(',').map(s => s.trim()).filter(Boolean) : [],
-        profile_completion: completion,
         updated_at: new Date().toISOString(),
       }
 
@@ -119,8 +111,11 @@ export default function ProfileForm() {
 
       setSavedOk(true)
       localStorage.removeItem('profile_form_started')
-      setProfileCompletion(completion)
-      toast.success(`Profile saved! ${completion}% complete`)
+      
+      // We don't need to manually call setProfileCompletion here anymore 
+      // because the Sidebar component is listening for real-time updates from Supabase.
+      
+      toast.success('Profile saved successfully!')
       await fetchProfile()
     } catch (err) {
       toast.error('Save failed: ' + err.message)
