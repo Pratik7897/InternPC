@@ -1,9 +1,0 @@
-{
-  "buildCommand": "npm --prefix pccoe-internship-portal run build",
-  "outputDirectory": "pccoe-internship-portal/dist",
-  "installCommand": "npm --prefix pccoe-internship-portal install",
-  "framework": "vite",
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/" }
-  ]
-}
