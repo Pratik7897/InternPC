@@ -159,22 +159,56 @@ export default function ProfileForm() {
             {currentStep === 1 && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div><Label>Full Name</Label><Input value={formData.fullName} onChange={update('fullName')} className="mt-1" /></div>
-                <div><Label>Phone</Label><Input value={formData.phone} onChange={update('phone')} className="mt-1" /></div>
+                <div><Label>Phone Number</Label><Input value={formData.phone} onChange={update('phone')} className="mt-1" /></div>
                 <div><Label>Date of Birth</Label><Input type="date" value={formData.dob} onChange={update('dob')} className="mt-1" /></div>
+                <div><Label>Gender</Label>
+                  <select value={formData.gender} onChange={update('gender')} className="w-full mt-1 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue outline-none">
+                    <option value="" className="bg-secondary text-white">Select Gender</option>
+                    <option value="Male" className="bg-secondary text-white">Male</option>
+                    <option value="Female" className="bg-secondary text-white">Female</option>
+                    <option value="Other" className="bg-secondary text-white">Other</option>
+                  </select>
+                </div>
                 <div><Label>LinkedIn URL</Label><Input value={formData.linkedin} onChange={update('linkedin')} className="mt-1" /></div>
+                <div><Label>GitHub URL</Label><Input value={formData.github} onChange={update('github')} className="mt-1" /></div>
               </div>
             )}
             {currentStep === 2 && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div><Label>PRN</Label><Input value={formData.prn} onChange={update('prn')} className="mt-1" /></div>
+                <div><Label>PRN Number</Label><Input value={formData.prn} onChange={update('prn')} className="mt-1" /></div>
+                <div><Label>Branch</Label>
+                  <select value={formData.branch} onChange={update('branch')} className="w-full mt-1 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm">
+                    <option value="">Select Branch</option>
+                    <option value="Computer Engineering">Computer Engineering</option>
+                    <option value="IT">IT</option>
+                    <option value="EnTC">EnTC</option>
+                    <option value="Mechanical">Mechanical</option>
+                    <option value="Civil">Civil</option>
+                  </select>
+                </div>
+                <div><Label>Current Year</Label>
+                  <select value={formData.year} onChange={update('year')} className="w-full mt-1 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm">
+                    <option value="">Select Year</option>
+                    <option value="FE">FE</option>
+                    <option value="SE">SE</option>
+                    <option value="TE">TE</option>
+                    <option value="BE">BE</option>
+                  </select>
+                </div>
                 <div><Label>CGPA</Label><Input type="number" step="0.01" value={formData.cgpa} onChange={update('cgpa')} className="mt-1" /></div>
+                <div><Label>Active Backlogs</Label><Input type="number" value={formData.backlogs} onChange={update('backlogs')} className="mt-1" /></div>
               </div>
             )}
-            {/* Shortened for brevity in this manual merge, keep core fields */}
             {currentStep === 3 && (
               <div className="space-y-6">
-                <Label>Skills (comma separated)</Label>
-                <Input value={formData.techSkills} onChange={update('techSkills')} className="mt-1" />
+                <div>
+                  <Label>Technical Skills (comma separated)</Label>
+                  <textarea value={formData.techSkills} onChange={update('techSkills')} className="w-full mt-1 h-24 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent-blue resize-none"></textarea>
+                </div>
+                <div>
+                  <Label>Soft Skills (comma separated)</Label>
+                  <textarea value={formData.softSkills} onChange={update('softSkills')} className="w-full mt-1 h-24 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent-blue resize-none"></textarea>
+                </div>
               </div>
             )}
             {currentStep === 4 && (
