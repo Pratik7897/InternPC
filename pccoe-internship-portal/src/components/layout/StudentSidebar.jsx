@@ -83,7 +83,7 @@ export default function StudentSidebar() {
   }, [user])
 
   return (
-    <div className="w-64 border-r border-white/10 bg-tertiary hidden md:flex flex-col h-full">
+    <div className="w-64 border-r bg-tertiary hidden md:flex flex-col h-full transition-colors duration-300" style={{ borderColor: 'var(--border)' }}>
       <div className="p-6">
         <h1 className="text-2xl font-heading font-bold text-accent-blue tracking-tight">PCCOE</h1>
         <p className="text-xs text-text-secondary mt-1">Student Portal</p>
@@ -99,7 +99,7 @@ export default function StudentSidebar() {
                 'flex items-center justify-between px-4 py-3 rounded-lg transition-all duration-200 text-sm font-medium',
                 isActive
                   ? 'bg-accent-blue/10 text-accent-blue border-l-2 border-accent-blue shadow-[var(--glow)]'
-                  : 'text-text-secondary hover:bg-white/5 hover:text-text-primary'
+                  : 'text-text-secondary hover:bg-accent-blue/5 hover:text-text-primary'
               )
             }
           >
@@ -114,12 +114,12 @@ export default function StudentSidebar() {
         ))}
       </nav>
 
-      <div className="p-4 mt-auto border-t border-white/10">
+      <div className="p-4 mt-auto shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
         <div className="glass-card p-4 mb-4 text-center">
           <div className="relative w-16 h-16 mx-auto mb-2">
             <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
               <path
-                className="text-white/10"
+                className="text-text-secondary/20"
                 strokeWidth="3"
                 stroke="currentColor"
                 fill="none"
@@ -142,7 +142,7 @@ export default function StudentSidebar() {
           <p className="text-xs text-text-secondary">Profile Completion</p>
         </div>
         
-        <div className="p-4 border-t border-white/10 shrink-0">
+        <div className="p-4 shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
           <button
             onClick={() => signOut()}
             className="flex items-center gap-3 w-full p-3 rounded-xl text-destructive hover:bg-destructive/10 transition-colors"

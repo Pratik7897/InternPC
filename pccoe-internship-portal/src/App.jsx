@@ -33,6 +33,7 @@ import EmailCenter from './pages/admin/EmailCenter'
 import AnnouncementsManagement from './pages/admin/AnnouncementsManagement'
 import ExportData from './pages/admin/ExportData'
 import { useAuthStore } from './store/authStore'
+import { useThemeStore } from './store/themeStore'
 
 // Protected Route Wrapper
 const ProtectedRoute = ({ role, children }) => {
@@ -46,6 +47,11 @@ const ProtectedRoute = ({ role, children }) => {
 
 function App() {
   const { checkSession, isLoading } = useAuthStore()
+  const initializeTheme = useThemeStore((state) => state.initializeTheme)
+
+  useEffect(() => {
+    initializeTheme()
+  }, [initializeTheme])
 
   useEffect(() => {
     // Check for OAuth error params in URL (e.g. bad_oauth_state after failed Google login)

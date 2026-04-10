@@ -1,6 +1,5 @@
 import { NavLink } from 'react-router-dom'
 import { LayoutDashboard, Users, Briefcase, FileText, Mail, Bell, LogOut, X } from 'lucide-react'
-import { useState } from 'react'
 import { useAuthStore } from '../../store/authStore'
 import { cn } from '../../lib/utils'
 
@@ -16,7 +15,7 @@ const navItems = [
 export default function AdminSidebar() {
   const { signOut } = useAuthStore()
   return (
-    <div className="w-64 border-r border-white/10 bg-tertiary hidden md:flex flex-col h-full object-contain">
+    <div className="w-64 border-r bg-tertiary hidden md:flex flex-col h-full object-contain transition-colors duration-300" style={{ borderColor: 'var(--border)' }}>
       <div className="p-6">
         <h1 className="text-2xl font-heading font-bold text-accent-gold tracking-tight">PCCOE</h1>
         <p className="text-xs text-text-secondary mt-1">Placement Cell Admin</p>
@@ -32,7 +31,7 @@ export default function AdminSidebar() {
                 "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-sm font-medium",
                 isActive 
                   ? "bg-accent-gold/10 text-accent-gold border-l-2 border-accent-gold shadow-[0_0_20px_rgba(245,158,11,0.15)]" 
-                  : "text-text-secondary hover:bg-white/5 hover:text-text-primary"
+                  : "text-text-secondary hover:bg-accent-gold/5 hover:text-text-primary"
               )
             }
           >
@@ -43,7 +42,7 @@ export default function AdminSidebar() {
       </nav>
 
       {/* Bottom Actions */}
-      <div className="p-4 border-t border-white/10 shrink-0">
+      <div className="p-4 shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
         <button 
           onClick={() => signOut()}
           className="flex items-center gap-3 w-full p-3 rounded-xl text-destructive hover:bg-destructive/10 transition-colors"

@@ -1,6 +1,6 @@
 export default function Footer() {
   return (
-    <footer className="border-t border-white/10 bg-secondary/50 backdrop-blur-md mt-auto">
+    <footer className="border-t bg-secondary/50 backdrop-blur-md mt-auto transition-colors duration-300" style={{ borderColor: 'var(--border)' }}>
       <div className="max-w-7xl mx-auto px-6 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="md:col-span-2">
@@ -28,7 +28,7 @@ export default function Footer() {
             </ul>
           </div>
         </div>
-        <div className="border-t border-white/10 mt-12 pt-8 flex flex-col md:flex-row items-center justify-between text-sm text-text-secondary">
+        <div className="mt-12 pt-8 flex flex-col md:flex-row items-center justify-between text-sm text-text-secondary transition-colors duration-300" style={{ borderTop: '1px solid var(--border)' }}>
           <p>© {new Date().getFullYear()} Pimpri Chinchwad College of Engineering. All rights reserved.</p>
           <div className="flex items-center gap-4 mt-4 md:mt-0">
             <a href="#" className="hover:text-accent-blue transition-colors">LinkedIn</a>
