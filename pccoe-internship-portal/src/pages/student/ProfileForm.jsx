@@ -1,8 +1,7 @@
-// DEBUG: Force git change detection
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check, ChevronRight, ChevronLeft, Save, Loader2, CheckCircle2, Home } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useBlocker, useBeforeUnload } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Label } from '../../components/ui/Label'
@@ -39,6 +38,7 @@ export default function ProfileForm() {
   const [isSaving, setIsSaving] = useState(false)
   const [isFetching, setIsFetching] = useState(true)
   const [savedOk, setSavedOk] = useState(false)
+  const [isDirty, setIsDirty] = useState(false)
   const [formData, setFormData] = useState(EMPTY_FORM)
 
   const fetchProfile = useCallback(async () => {
@@ -80,6 +80,27 @@ export default function ProfileForm() {
   useEffect(() => {
     fetchProfile()
   }, [fetchProfile])
+
+  // Browser-level navigation guard (refresh/close tab)
+  useBeforeUnload(
+    useCallback(
+      (event) => {
+        if (isDirty && !savedOk) {
+          event.preventDefault()
+          return (event.returnValue = 'You have unsaved changes. Are you sure you want to leave?')
+        }
+      },
+      [isDirty, savedOk]
+    )
+  )
+
+  // Internal navigation guard (link clicks in app)
+  useBlocker(({ nextLocation }) => {
+    if (isDirty && !savedOk && nextLocation.pathname !== window.location.pathname) {
+      return !window.confirm('You have unsaved changes. Progress will be lost. Continue?')
+    }
+    return false
+  })
 
   const isStepValid = (step) => {
     switch(step) {
@@ -144,6 +165,7 @@ export default function ProfileForm() {
       }
 
       setSavedOk(true)
+      setIsDirty(false)
       localStorage.removeItem('profile_form_started')
       toast.success('Profile saved successfully!')
       
@@ -159,6 +181,7 @@ export default function ProfileForm() {
   }
 
   const update = (field) => (e) => {
+    setIsDirty(true)
     if (!localStorage.getItem('profile_form_started')) {
       localStorage.setItem('profile_form_started', Date.now().toString())
     }
