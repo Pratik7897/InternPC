@@ -13,10 +13,10 @@ export default function Header({ userRole = 'student' }) {
 
       <div className="flex items-center gap-3 text-text-secondary">
         <ThemeToggle />
-        <button className="p-2 hover:bg-accent-blue/10 rounded-full transition-colors relative">
+        <Link to={`/${userRole}/notifications`} className="p-2 hover:bg-accent-blue/10 rounded-full transition-colors relative">
           <Bell className="w-5 h-5" />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-accent-blue rounded-full"></span>
-        </button>
+        </Link>
         <div className="flex items-center gap-3 border-l pl-3 transition-colors duration-300">
           <div className="w-8 h-8 rounded-full bg-accent-blue/20 flex items-center justify-center text-accent-blue">
             <User className="w-4 h-4" />
