@@ -1,7 +1,8 @@
 // DEBUG: Force git change detection
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Check, ChevronRight, ChevronLeft, Save, Loader2, CheckCircle2 } from 'lucide-react'
+import { Check, ChevronRight, ChevronLeft, Save, Loader2, CheckCircle2, Home } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Label } from '../../components/ui/Label'
@@ -247,13 +248,21 @@ export default function ProfileForm() {
             {currentStep === 4 && (
               <div className="space-y-6 text-center py-8">
                 {savedOk ? (
-                  <>
-                    <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Check className="w-10 h-10 text-green-500" />
+                  <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
+                    <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <Check className="w-12 h-12 text-green-500" />
                     </div>
-                    <h3 className="text-xl font-bold">Profile Saved!</h3>
-                    <p className="text-text-secondary text-sm">Your information has been updated successfully.</p>
-                  </>
+                    <h3 className="text-2xl font-bold text-text-primary">Profile Complete!</h3>
+                    <p className="text-text-secondary mt-2 mb-8 max-w-sm mx-auto">
+                      Your profile has been updated and is now visible to recruiters.
+                    </p>
+                    <Link to="/student/dashboard">
+                      <Button className="bg-accent-blue shadow-[var(--glow)] gap-2 px-8">
+                        <Home className="w-4 h-4" />
+                        Go to Dashboard
+                      </Button>
+                    </Link>
+                  </motion.div>
                 ) : (
                   <>
                     <CheckCircle2 className="w-16 h-16 text-accent-blue mx-auto mb-4" />
@@ -266,18 +275,20 @@ export default function ProfileForm() {
           </motion.div>
         </AnimatePresence>
 
-        <div className="mt-8 pt-6 border-t border-white/10 flex items-center justify-between">
-          <Button variant="ghost" onClick={handlePrev} disabled={currentStep === 1 || isSaving}>Back</Button>
-          <div className="flex items-center gap-3">
-            {currentStep < 4 ? (
-              <Button onClick={handleNext} disabled={!isStepValid(currentStep)}>Next</Button>
-            ) : (
-              <Button onClick={handleComplete} disabled={isSaving || !isStepValid(3)} className="bg-accent-blue min-w-[150px]">
-                {isSaving ? 'Saving...' : 'Submit Profile'}
-              </Button>
-            )}
+        {!savedOk && (
+          <div className="mt-8 pt-6 border-t border-white/10 flex items-center justify-between">
+            <Button variant="ghost" onClick={handlePrev} disabled={currentStep === 1 || isSaving}>Back</Button>
+            <div className="flex items-center gap-3">
+              {currentStep < 4 ? (
+                <Button onClick={handleNext} disabled={!isStepValid(currentStep)}>Next</Button>
+              ) : (
+                <Button onClick={handleComplete} disabled={isSaving || !isStepValid(3)} className="bg-accent-blue min-w-[150px]">
+                  {isSaving ? 'Saving...' : 'Submit Profile'}
+                </Button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   )
