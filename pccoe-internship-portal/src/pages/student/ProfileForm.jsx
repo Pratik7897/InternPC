@@ -80,7 +80,26 @@ export default function ProfileForm() {
     fetchProfile()
   }, [fetchProfile])
 
-  const handleNext = () => setCurrentStep(s => Math.min(s + 1, 4))
+  const isStepValid = (step) => {
+    switch(step) {
+      case 1:
+        return !!(formData.fullName && formData.phone && formData.dob && formData.gender)
+      case 2:
+        return !!(formData.prn && formData.branch && formData.year && formData.cgpa)
+      case 3:
+        return !!(formData.techSkills.trim())
+      default:
+        return true
+    }
+  }
+
+  const handleNext = () => {
+    if (isStepValid(currentStep)) {
+      setCurrentStep(s => Math.min(s + 1, 4))
+    } else {
+      toast.error('Please fill in all required fields.')
+    }
+  }
   const handlePrev = () => setCurrentStep(s => Math.max(s - 1, 1))
 
   const handleComplete = async () => {
@@ -172,11 +191,11 @@ export default function ProfileForm() {
           <motion.div key={currentStep} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex-1">
             {currentStep === 1 && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div><Label>Full Name</Label><Input value={formData.fullName} onChange={update('fullName')} className="mt-1" /></div>
-                <div><Label>Phone Number</Label><Input value={formData.phone} onChange={update('phone')} className="mt-1" /></div>
-                <div><Label>Date of Birth</Label><Input type="date" value={formData.dob} onChange={update('dob')} className="mt-1" /></div>
-                <div><Label>Gender</Label>
-                  <select value={formData.gender} onChange={update('gender')} className="w-full mt-1 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue outline-none">
+                <div><Label>Full Name <span className="text-red-500">*</span></Label><Input value={formData.fullName} onChange={update('fullName')} className="mt-1" /></div>
+                <div><Label>Phone Number <span className="text-red-500">*</span></Label><Input value={formData.phone} onChange={update('phone')} className="mt-1" /></div>
+                <div><Label>Date of Birth <span className="text-red-500">*</span></Label><Input type="date" value={formData.dob} onChange={update('dob')} className="mt-1" /></div>
+                <div><Label>Gender <span className="text-red-500">*</span></Label>
+                  <select value={formData.gender} onChange={update('gender')} className="w-full mt-1 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue outline-none transition-colors">
                     <option value="" className="bg-secondary text-white">Select Gender</option>
                     <option value="Male" className="bg-secondary text-white">Male</option>
                     <option value="Female" className="bg-secondary text-white">Female</option>
@@ -189,8 +208,8 @@ export default function ProfileForm() {
             )}
             {currentStep === 2 && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div><Label>PRN Number</Label><Input value={formData.prn} onChange={update('prn')} className="mt-1" /></div>
-                <div><Label>Branch</Label>
+                <div><Label>PRN Number <span className="text-red-500">*</span></Label><Input value={formData.prn} onChange={update('prn')} className="mt-1" /></div>
+                <div><Label>Branch <span className="text-red-500">*</span></Label>
                   <select value={formData.branch} onChange={update('branch')} className="w-full mt-1 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm">
                     <option value="">Select Branch</option>
                     <option value="Computer Engineering">Computer Engineering</option>
@@ -200,7 +219,7 @@ export default function ProfileForm() {
                     <option value="Civil">Civil</option>
                   </select>
                 </div>
-                <div><Label>Current Year</Label>
+                <div><Label>Current Year <span className="text-red-500">*</span></Label>
                   <select value={formData.year} onChange={update('year')} className="w-full mt-1 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm">
                     <option value="">Select Year</option>
                     <option value="FE">FE</option>
@@ -209,14 +228,14 @@ export default function ProfileForm() {
                     <option value="BE">BE</option>
                   </select>
                 </div>
-                <div><Label>CGPA</Label><Input type="number" step="0.01" value={formData.cgpa} onChange={update('cgpa')} className="mt-1" /></div>
+                <div><Label>CGPA <span className="text-red-500">*</span></Label><Input type="number" step="0.01" value={formData.cgpa} onChange={update('cgpa')} className="mt-1" /></div>
                 <div><Label>Active Backlogs</Label><Input type="number" value={formData.backlogs} onChange={update('backlogs')} className="mt-1" /></div>
               </div>
             )}
             {currentStep === 3 && (
               <div className="space-y-6">
                 <div>
-                  <Label>Technical Skills (comma separated)</Label>
+                  <Label>Technical Skills (comma separated) <span className="text-red-500">*</span></Label>
                   <textarea value={formData.techSkills} onChange={update('techSkills')} className="w-full mt-1 h-24 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent-blue resize-none"></textarea>
                 </div>
                 <div>
@@ -250,8 +269,10 @@ export default function ProfileForm() {
         <div className="mt-8 pt-6 border-t border-white/10 flex items-center justify-between">
           <Button variant="ghost" onClick={handlePrev} disabled={currentStep === 1 || isSaving}>Back</Button>
           <div className="flex items-center gap-3">
-            {currentStep < 4 ? <Button onClick={handleNext}>Next</Button> : (
-              <Button onClick={handleComplete} disabled={isSaving} className="bg-accent-blue min-w-[150px]">
+            {currentStep < 4 ? (
+              <Button onClick={handleNext} disabled={!isStepValid(currentStep)}>Next</Button>
+            ) : (
+              <Button onClick={handleComplete} disabled={isSaving || !isStepValid(3)} className="bg-accent-blue min-w-[150px]">
                 {isSaving ? 'Saving...' : 'Submit Profile'}
               </Button>
             )}
