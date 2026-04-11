@@ -10,7 +10,6 @@ import toast from 'react-hot-toast'
 import ThemeToggle from '../../components/ui/ThemeToggle'
 
 export default function LoginPage() {
-  const [isStudent, setIsStudent] = useState(true)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isOAuthLoading, setIsOAuthLoading] = useState(false)
@@ -30,12 +29,12 @@ export default function LoginPage() {
       return
     }
 
-    const res = await signIn(email, password, isStudent)
+    const res = await signIn(email, password)
     if (res.error) {
       toast.error(res.error)
     } else {
       toast.success('Login successful')
-      navigate(res.role === 'admin' ? '/admin/dashboard' : '/student/dashboard')
+      navigate('/student/dashboard')
     }
   }
 
@@ -99,22 +98,8 @@ export default function LoginPage() {
 
         <div className="glass-card p-8 transition-all duration-300">
           
-          <div className="flex p-1 bg-secondary dark:bg-white/5 rounded-lg border border-border dark:border-white/10 mb-8 relative transition-colors duration-300">
-            <div 
-              className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-accent-blue/20 dark:bg-white/10 rounded-md transition-all duration-300 ${isStudent ? 'left-1' : 'left-[calc(50%+2px)]'} shadow-sm border border-accent-blue/30 dark:border-white/10`}
-            ></div>
-            <button 
-              className={`flex-1 py-2 text-sm font-medium relative z-10 transition-colors duration-300 ${isStudent ? 'text-text-primary dark:text-white' : 'text-text-secondary hover:text-text-primary dark:hover:text-white'}`}
-              onClick={() => setIsStudent(true)}
-            >
-              Student
-            </button>
-            <button 
-              className={`flex-1 py-2 text-sm font-medium relative z-10 transition-colors duration-300 ${!isStudent ? 'text-text-primary dark:text-white' : 'text-text-secondary hover:text-text-primary dark:hover:text-white'}`}
-              onClick={() => setIsStudent(false)}
-            >
-              Admin
-            </button>
+          <div className="mb-8">
+            <h2 className="text-center text-sm text-text-secondary font-medium uppercase tracking-wider">Student Portal Access</h2>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-5">
@@ -123,7 +108,7 @@ export default function LoginPage() {
               <Input 
                 id="email" 
                 type="email" 
-                placeholder={isStudent ? 'prn@pccoepune.org' : 'admin@pccoepune.org'}
+                placeholder="prn@pccoepune.org"
                 className="mt-1.5"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -193,14 +178,12 @@ export default function LoginPage() {
             </Button>
           </div>
 
-          {isStudent && (
-            <div className="mt-6 text-center text-sm text-text-secondary border-t border-border dark:border-white/5 pt-6 transition-colors duration-300">
-              New student?{' '}
-              <Link to="/register" className="text-accent-blue hover:underline font-medium">
-                Register here
-              </Link>
-            </div>
-          )}
+          <div className="mt-6 text-center text-sm text-text-secondary border-t border-border dark:border-white/5 pt-6 transition-colors duration-300">
+            New student?{' '}
+            <Link to="/register" className="text-accent-blue hover:underline font-medium">
+              Register here
+            </Link>
+          </div>
         </div>
       </motion.div>
     </div>

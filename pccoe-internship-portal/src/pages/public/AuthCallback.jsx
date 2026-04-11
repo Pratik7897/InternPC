@@ -78,27 +78,10 @@ export default function AuthCallback() {
         return
       }
 
-      setStatus('Checking your account...')
-
-      // Determine role
-      const { data: adminData } = await supabase
-        .from('admin_users')
-        .select('id')
-        .eq('id', currentUser.id)
-        .maybeSingle()
-
-      const role = adminData ? 'admin' : 'student'
       const providerToken = session.provider_token || null
 
       if (providerToken) {
         localStorage.setItem('gmail_provider_token', providerToken)
-      }
-
-      if (role === 'admin') {
-        setUser(currentUser, 'admin', providerToken)
-        toast.success('Welcome back, Admin!')
-        navigate('/admin/dashboard', { replace: true })
-        return
       }
 
       // Student: ensure a profile row exists
@@ -123,7 +106,7 @@ export default function AuthCallback() {
         }
       }
 
-      setUser(currentUser, 'student', providerToken)
+      setUser(currentUser, providerToken)
       toast.success('Login successful! Welcome to the portal.')
       navigate('/student/dashboard', { replace: true })
     }

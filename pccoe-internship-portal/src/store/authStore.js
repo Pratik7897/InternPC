@@ -23,7 +23,6 @@ const clearProviderToken = () => {
 
 export const useAuthStore = create((set, get) => ({
   user: null,
-  role: null, // 'student' | 'admin'
   providerToken: loadProviderToken(), // Restore from localStorage immediately
   isLoading: true, // Start true while we check initial session
   profileCompletion: 0, // 0-100, updated after profile save
@@ -32,7 +31,7 @@ export const useAuthStore = create((set, get) => ({
   // Method to check active session on refresh
   checkSession: async () => {
     if (!isSupabaseConfigured) {
-      set({ user: null, role: null, providerToken: null, isLoading: false })
+      set({ user: null, providerToken: null, isLoading: false })
       return
     }
 
@@ -46,18 +45,12 @@ export const useAuthStore = create((set, get) => ({
           console.warn('Stale refresh token detected — clearing session.')
           await supabase.auth.signOut()
           clearProviderToken()
-          set({ user: null, role: null, providerToken: null, isLoading: false })
+          set({ user: null, providerToken: null, isLoading: false })
           return
         }
       }
 
       if (session?.user) {
-        const { data: adminData } = await supabase
-          .from('admin_users')
-          .select('id')
-          .eq('id', session.user.id)
-          .maybeSingle()
-
         const freshToken = session.provider_token || loadProviderToken()
         if (session.provider_token) {
           saveProviderToken(session.provider_token)
@@ -65,20 +58,19 @@ export const useAuthStore = create((set, get) => ({
 
         set({
           user: session.user,
-          role: adminData ? 'admin' : 'student',
           providerToken: freshToken,
           isLoading: false
         })
       } else {
         clearProviderToken()
-        set({ user: null, role: null, providerToken: null, isLoading: false })
+        set({ user: null, providerToken: null, isLoading: false })
       }
     } catch (err) {
       console.error('Initial session check failed:', err)
       // On any unrecoverable auth error, wipe everything and let user re-login
       clearProviderToken()
       await supabase.auth.signOut().catch(() => {})
-      set({ user: null, role: null, providerToken: null, isLoading: false })
+      set({ user: null, providerToken: null, isLoading: false })
     }
 
     // Only register the auth state listener ONCE globally
@@ -88,16 +80,10 @@ export const useAuthStore = create((set, get) => ({
         console.log('Auth state change:', event)
         if (event === 'SIGNED_OUT') {
           clearProviderToken()
-          set({ user: null, role: null, providerToken: null })
+          set({ user: null, providerToken: null })
           return
         }
         if (session?.user) {
-          const { data: adminData } = await supabase
-            .from('admin_users')
-            .select('id')
-            .eq('id', session.user.id)
-            .maybeSingle()
-
           // Persist fresh token if available
           if (session.provider_token) {
             saveProviderToken(session.provider_token)
@@ -106,24 +92,23 @@ export const useAuthStore = create((set, get) => ({
 
           set({
             user: session.user,
-            role: adminData ? 'admin' : 'student',
             providerToken: token
           })
         } else {
           clearProviderToken()
-          set({ user: null, role: null, providerToken: null })
+          set({ user: null, providerToken: null })
         }
       })
     }
   },
 
-  setUser: (user, role, providerToken = null) => {
+  setUser: (user, providerToken = null) => {
     if (providerToken) saveProviderToken(providerToken)
-    set({ user, role, providerToken: providerToken || loadProviderToken() })
+    set({ user, providerToken: providerToken || loadProviderToken() })
   },
   setLoading: (isLoading) => set({ isLoading }),
 
-  signIn: async (email, password, isStudent) => {
+  signIn: async (email, password) => {
     if (!isSupabaseConfigured) return { error: 'Database connection missing. Contact administrator.' }
 
     // Validate email domain - only @pccoepune.org users allowed
@@ -138,20 +123,8 @@ export const useAuthStore = create((set, get) => ({
 
       if (!data?.user) throw new Error('Failed to retrieve user data.')
 
-      const { data: adminData } = await supabase
-        .from('admin_users')
-        .select('id')
-        .eq('id', data.user.id)
-        .maybeSingle()
-      const actualRole = adminData ? 'admin' : 'student'
-
-      if ((isStudent && actualRole === 'admin') || (!isStudent && actualRole === 'student')) {
-        await supabase.auth.signOut()
-        return { error: 'Invalid login portal for your role type. Please switch tabs.' }
-      }
-
-      set({ user: data.user, role: actualRole })
-      return { success: true, role: actualRole }
+      set({ user: data.user })
+      return { success: true }
     } catch (error) {
       if (error.message.includes('Invalid login credentials')) {
         return { error: 'Invalid email or password. If you signed up with Google, please use the "Sign in with Google" button instead.' }
@@ -253,6 +226,6 @@ export const useAuthStore = create((set, get) => ({
     set({ isLoading: true })
     clearProviderToken()
     await supabase.auth.signOut()
-    set({ user: null, role: null, providerToken: null, isLoading: false })
+    set({ user: null, providerToken: null, isLoading: false })
   }
 }))

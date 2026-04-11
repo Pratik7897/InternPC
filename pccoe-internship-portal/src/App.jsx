@@ -5,7 +5,6 @@ import toast from 'react-hot-toast'
 
 // Layouts implies some wrapping components
 import StudentLayout from './components/layout/StudentLayout'
-import AdminLayout from './components/layout/AdminLayout'
 
 // Public Pages
 import LandingPage from './pages/public/LandingPage'
@@ -24,23 +23,15 @@ import BrowseInternships from './pages/student/BrowseInternships'
 import MyApplications from './pages/student/MyApplications'
 import Notifications from './pages/student/Notifications'
 
-// Admin Pages
-import AdminDashboard from './pages/admin/AdminDashboard'
-import StudentsManagement from './pages/admin/StudentsManagement'
-import InternshipsManagement from './pages/admin/InternshipsManagement'
-import ApplicationsManagement from './pages/admin/ApplicationsManagement'
-import EmailCenter from './pages/admin/EmailCenter'
-import AnnouncementsManagement from './pages/admin/AnnouncementsManagement'
-import ExportData from './pages/admin/ExportData'
+
 import { useAuthStore } from './store/authStore'
 import { useThemeStore } from './store/themeStore'
 
 // Protected Route Wrapper
-const ProtectedRoute = ({ role, children }) => {
-  const { user, role: userRole } = useAuthStore()
+const ProtectedRoute = ({ children }) => {
+  const { user } = useAuthStore()
 
   if (!user) return <Navigate to="/login" replace />
-  if (role && userRole !== role) return <Navigate to="/login" replace />
   
   return children
 }
@@ -97,7 +88,7 @@ function App() {
         <Route path="/internships" element={<InternshipsPublicPage />} />
 
         {/* Student Routes */}
-        <Route path="/student" element={<ProtectedRoute role="student"><StudentLayout /></ProtectedRoute>}>
+        <Route path="/student" element={<ProtectedRoute><StudentLayout /></ProtectedRoute>}>
           <Route path="dashboard" element={<StudentDashboard />} />
           <Route path="profile" element={<ProfileForm />} />
           <Route path="upload" element={<UploadCenter />} />
@@ -107,17 +98,7 @@ function App() {
           <Route index element={<Navigate to="dashboard" replace />} />
         </Route>
 
-        {/* Admin Routes */}
-        <Route path="/admin" element={<ProtectedRoute role="admin"><AdminLayout /></ProtectedRoute>}>
-          <Route path="dashboard" element={<AdminDashboard />} />
-          <Route path="students" element={<StudentsManagement />} />
-          <Route path="internships" element={<InternshipsManagement />} />
-          <Route path="applications" element={<ApplicationsManagement />} />
-          <Route path="email" element={<EmailCenter />} />
-          <Route path="announcements" element={<AnnouncementsManagement />} />
-          <Route path="export" element={<ExportData />} />
-          <Route index element={<Navigate to="dashboard" replace />} />
-        </Route>
+        {/* Admin Routes Removed */}
       </Routes>
     </Router>
   )

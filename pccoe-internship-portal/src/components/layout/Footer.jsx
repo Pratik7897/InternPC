@@ -15,7 +15,6 @@ export default function Footer() {
               <li><a href="/directory" className="hover:text-accent-blue transition-colors">Student Directory</a></li>
               <li><a href="/internships" className="hover:text-accent-blue transition-colors">Browse Internships</a></li>
               <li><a href="/login" className="hover:text-accent-blue transition-colors">Student Login</a></li>
-              <li><a href="/login" className="hover:text-accent-blue transition-colors">Admin Portal</a></li>
             </ul>
           </div>
           <div>
