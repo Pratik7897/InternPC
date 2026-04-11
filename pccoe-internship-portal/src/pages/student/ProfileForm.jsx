@@ -84,20 +84,25 @@ export default function ProfileForm() {
   const handlePrev = () => setCurrentStep(s => Math.max(s - 1, 1))
 
   const handleComplete = async () => {
-    if (!user?.id) return
+    if (!user?.id) {
+      toast.error('Session expired. Please log in again.')
+      return
+    }
+    
     setIsSaving(true)
     setSavedOk(false)
+    
     try {
       const payload = {
         id: user.id,
         email: user.email,
-        full_name: formData.fullName || null,
-        phone: formData.phone || null,
+        full_name: formData.fullName?.trim() || null,
+        phone: formData.phone?.trim() || null,
         date_of_birth: formData.dob || null,
         gender: formData.gender || null,
-        linkedin_url: formData.linkedin || null,
-        github_url: formData.github || null,
-        prn_number: formData.prn || null,
+        linkedin_url: formData.linkedin?.trim() || null,
+        github_url: formData.github?.trim() || null,
+        prn_number: formData.prn?.trim() || null,
         branch: formData.branch || null,
         current_year: formData.year || null,
         cgpa: formData.cgpa ? parseFloat(formData.cgpa) : null,
@@ -107,19 +112,27 @@ export default function ProfileForm() {
         updated_at: new Date().toISOString(),
       }
 
-      const { error } = await supabase.from('profiles').upsert(payload)
-      if (error) throw error
+      // Use upsert with explicit onConflict for better reliability
+      const { error } = await supabase.from('profiles').upsert(payload, { onConflict: 'id' })
+      
+      if (error) {
+        if (error.code === '23505') {
+          if (error.message.includes('prn_number')) throw new Error('PRN Number already exists.')
+          if (error.message.includes('email')) throw new Error('Email already exists.')
+        }
+        throw error
+      }
 
       setSavedOk(true)
       localStorage.removeItem('profile_form_started')
-      
-      // We don't need to manually call setProfileCompletion here anymore 
-      // because the Sidebar component is listening for real-time updates from Supabase.
-      
       toast.success('Profile saved successfully!')
-      await fetchProfile()
+      
+      // Removed redundant await fetchProfile() as it was causing a full-page loading blink
+      // and state potential conflicts. Local state is already in sync.
+      
     } catch (err) {
-      toast.error('Save failed: ' + err.message)
+      console.error('Save error:', err)
+      toast.error('Save failed: ' + (err.message || 'Unknown error'))
     } finally {
       setIsSaving(false)
     }
@@ -214,9 +227,21 @@ export default function ProfileForm() {
             )}
             {currentStep === 4 && (
               <div className="space-y-6 text-center py-8">
-                <CheckCircle2 className="w-16 h-16 text-accent-blue mx-auto mb-4" />
-                <h3 className="text-xl font-bold">Ready to Submit?</h3>
-                <p className="text-text-secondary text-sm">Review your details before finalizing.</p>
+                {savedOk ? (
+                  <>
+                    <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Check className="w-10 h-10 text-green-500" />
+                    </div>
+                    <h3 className="text-xl font-bold">Profile Saved!</h3>
+                    <p className="text-text-secondary text-sm">Your information has been updated successfully.</p>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-16 h-16 text-accent-blue mx-auto mb-4" />
+                    <h3 className="text-xl font-bold">Ready to Submit?</h3>
+                    <p className="text-text-secondary text-sm">Review your details before finalizing.</p>
+                  </>
+                )}
               </div>
             )}
           </motion.div>
