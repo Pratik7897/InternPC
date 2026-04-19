@@ -1,12 +1,19 @@
 import { Link } from 'react-router-dom'
 import { Bell, User } from 'lucide-react'
 import ThemeToggle from '../ui/ThemeToggle'
+import { useThemeStore } from '../../store/themeStore'
 
 export default function Header({ userRole = 'student' }) {
+  const { theme } = useThemeStore()
+
   return (
     <header className="h-16 border-b glass flex items-center justify-between px-6 sticky top-0 z-40 transition-all duration-300">
       <div className="flex items-center gap-4 md:hidden">
-        <span className="font-heading font-bold text-lg text-accent-blue">PCCOE</span>
+        <img 
+          src="/logo.png" 
+          alt="PCCOE Logo" 
+          className="h-8 object-contain" 
+        />
       </div>
       
       <div className="hidden md:block"></div>

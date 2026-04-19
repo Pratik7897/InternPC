@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { cn } from '../../lib/utils'
 import { useAuthStore } from '../../store/authStore'
 import { supabase } from '../../lib/supabase'
+import { useThemeStore } from '../../store/themeStore'
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/student/dashboard' },
@@ -16,6 +17,7 @@ const navItems = [
 
 export default function StudentSidebar() {
   const { signOut, user, profileCompletion, setProfileCompletion } = useAuthStore()
+  const { theme } = useThemeStore()
   const [hasUnread, setHasUnread] = useState(false)
 
   // Real-time profile completion sync
@@ -84,9 +86,13 @@ export default function StudentSidebar() {
 
   return (
     <div className="w-64 border-r bg-tertiary hidden md:flex flex-col h-full transition-colors duration-300" style={{ borderColor: 'var(--border)' }}>
-      <div className="p-6">
-        <h1 className="text-2xl font-heading font-bold text-accent-blue tracking-tight">PCCOE</h1>
-        <p className="text-xs text-text-secondary mt-1">Student Portal</p>
+      <div className="p-6 text-center border-b border-border/10 mb-2">
+        <img 
+          src="/logo.png" 
+          alt="PCCOE Logo" 
+          className="h-16 mx-auto object-contain mb-2 drop-shadow-md" 
+        />
+        <p className="text-xs text-text-secondary mt-1 font-medium tracking-wide uppercase">Student Portal</p>
       </div>
 
       <nav className="flex-1 px-4 space-y-2 mt-4">

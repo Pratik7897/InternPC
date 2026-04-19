@@ -79,9 +79,11 @@ export default function RegisterPage() {
         </div>
 
         <Link to="/" className="text-center block mb-8">
-          <div className="w-12 h-12 mx-auto bg-background/80 dark:bg-white/10 rounded-xl flex items-center justify-center border border-border dark:border-white/20 mb-4 transition-all duration-300">
-            <span className="text-xl font-heading font-bold text-accent-blue">PC</span>
-          </div>
+          <img 
+            src="/logo.png" 
+            alt="PCCOE Logo" 
+            className="h-16 max-w-full mx-auto object-contain mb-4 drop-shadow-md" 
+          />
           <h1 className="text-2xl font-heading font-bold text-text-primary">Student Registration</h1>
           <p className="text-text-secondary mt-1">Create your PCCOE placement account</p>
         </Link>

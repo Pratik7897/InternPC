@@ -89,9 +89,11 @@ export default function LoginPage() {
         </div>
 
         <Link to="/" className="text-center block mb-8">
-          <div className="w-16 h-16 mx-auto bg-background/80 dark:bg-white/10 rounded-xl flex items-center justify-center border border-border dark:border-white/20 shadow-[var(--glow)] mb-4 transition-all duration-300">
-            <span className="text-2xl font-heading font-bold text-accent-blue">PC</span>
-          </div>
+          <img 
+            src="/logo.png" 
+            alt="PCCOE Logo" 
+            className="h-20 max-w-full mx-auto object-contain mb-4 drop-shadow-md" 
+          />
           <h1 className="text-2xl font-heading font-bold text-text-primary">Welcome Back</h1>
           <p className="text-text-secondary mt-1">Sign in to your PCCOE account</p>
         </Link>

@@ -34,7 +34,7 @@ export default function LandingPage() {
           className="mb-8 relative"
         >
           <div className="w-24 h-24 mx-auto bg-background/80 dark:bg-white/10 rounded-2xl flex items-center justify-center border border-border dark:border-white/20 shadow-[var(--glow)] backdrop-blur-md transition-all duration-300">
-            <span className="text-4xl font-heading font-bold text-accent-blue">PC</span>
+            <img src="/logo.png" alt="PCCOE Logo" className="w-20 h-20 object-contain" />
           </div>
         </motion.div>
         
