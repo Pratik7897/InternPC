@@ -8,29 +8,22 @@ export default function ThemeToggle() {
   return (
     <button
       onClick={toggleTheme}
-      className="relative w-14 h-7 rounded-full bg-gradient-to-r from-[#1e293b] to-[#334155] dark:from-[#1e293b] dark:to-[#334155] transition-all duration-300 hover:shadow-lg hover:shadow-accent-blue/20 group"
+      className="relative inline-flex items-center justify-center w-10 h-10 overflow-hidden rounded-full transition-colors duration-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-accent-blue/50 group"
       aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
     >
-      <div className="absolute inset-0 flex items-center justify-between px-1">
-        <div className={`flex items-center justify-center w-5 h-5 rounded-full transition-all duration-300 ${isDark ? 'translate-x-0' : 'translate-x-7'}`}>
-          {isDark ? (
-            <Moon className="w-3.5 h-3.5 text-accent-blue" />
-          ) : (
-            <Sun className="w-3.5 h-3.5 text-accent-gold" />
-          )}
-        </div>
-      </div>
-      
-      <div 
-        className={`
-          absolute top-0.5 w-6 h-6 rounded-full 
-          bg-gradient-to-br from-white to-slate-100
-          dark:from-accent-blue/20 dark:to-accent-blue/10
-          shadow-md transition-all duration-300 ease-out
-          ${isDark ? 'left-0.5' : 'left-7.5'}
-          group-hover:scale-110
-        `}
+      <Sun 
+        className={`absolute w-5 h-5 transition-all duration-500 ease-in-out ${
+          isDark ? '-rotate-90 opacity-0 scale-50' : 'rotate-0 opacity-100 scale-100 text-amber-500 group-hover:text-amber-600'
+        }`} 
       />
+      <Moon 
+        className={`absolute w-5 h-5 transition-all duration-500 ease-in-out ${
+          isDark ? 'rotate-0 opacity-100 scale-100 text-blue-400 group-hover:text-blue-300' : 'rotate-90 opacity-0 scale-50'
+        }`} 
+      />
+      
+      {/* Optional minimal subtle background glow effect */}
+      <span className="absolute inset-0 rounded-full bg-current opacity-0 transition-opacity duration-300 group-hover:opacity-5"></span>
     </button>
   )
 }
