@@ -92,9 +92,9 @@ CREATE TABLE email_logs (
 CREATE TABLE announcements (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title      TEXT,
-  body       TEXT,
-  type       TEXT,  -- info | urgent | event
-  posted_by  UUID REFERENCES admin_users(id),
+  content    TEXT,
+  type       TEXT DEFAULT 'info' CHECK (type = ANY (ARRAY['info', 'urgent', 'event'])),
+  posted_by  UUID REFERENCES auth.users(id),
   is_active  BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );

@@ -546,7 +546,7 @@ export default function Notifications() {
                       <span className="text-xs text-text-secondary whitespace-nowrap">{formatDate(ann.created_at)}</span>
                     </div>
                   </div>
-                   <p className="text-sm text-text-secondary leading-relaxed">{ann.body || ann.content}</p>
+                   <p className="text-sm text-text-secondary leading-relaxed">{ann.content}</p>
                 </div>
               </motion.div>
             )
