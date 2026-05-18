@@ -76,3 +76,18 @@ ALTER TABLE applications ENABLE ROW LEVEL SECURITY;
 --    where is_active is null (older entries)
 -- -------------------------------------------------------
 UPDATE internships SET is_active = true WHERE is_active IS NULL;
+
+-- -------------------------------------------------------
+-- 5. PROFILES TABLE — Public Directory Access
+--    Allow unauthenticated (anon) visitors to read public profiles
+--    so the /directory page works without login.
+-- -------------------------------------------------------
+DROP POLICY IF EXISTS "Authenticated read public profiles" ON profiles;
+DROP POLICY IF EXISTS "Public read active profiles" ON profiles;
+
+-- Grants SELECT to both anon and authenticated roles on public profiles
+CREATE POLICY "Anyone can read public profiles"
+  ON profiles FOR SELECT
+  TO anon, authenticated
+  USING (is_profile_public = true);
+
