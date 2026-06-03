@@ -36,14 +36,20 @@ export const useAuthStore = create((set, get) => ({
     }
 
     try {
-      const { data: { session }, error } = await supabase.auth.getSession()
+      // Add a timeout so the app doesn't hang infinitely if Supabase is down or unreachable
+      const sessionPromise = supabase.auth.getSession()
+      const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve({ error: new Error('Network Timeout') }), 3000))
+      
+      const { data, error } = await Promise.race([sessionPromise, timeoutPromise])
+      const session = data?.session
 
       if (error) {
-        console.warn('Session check error:', error)
+        console.warn('Session check error or timeout:', error)
         // If the refresh token is invalid/expired, force sign out and clear storage
-        if (error.message?.includes('Refresh Token') || error.message?.includes('refresh_token')) {
-          console.warn('Stale refresh token detected — clearing session.')
-          await supabase.auth.signOut()
+        if (error.message?.includes('Refresh Token') || error.message?.includes('refresh_token') || error.message?.includes('Network Timeout')) {
+          console.warn('Stale token or timeout detected — clearing session.')
+          // Do not await signOut if it's a timeout, it will just hang again
+          supabase.auth.signOut().catch(() => {})
           clearProviderToken()
           set({ user: null, providerToken: null, isLoading: false })
           return
